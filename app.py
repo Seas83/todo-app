@@ -27,11 +27,11 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 4. Users List (user1 is the Admin)
+# 4. Users List (Fadi is the Admin)
 USERS = {
-    "user1": "pass123",
-    "user2": "pass123",
-    "user3": "pass123"
+    "Fadi": "Fadi@1983",
+    "Hamza": "H@123",
+    "Edwan": "E@123"
 }
 
 ADMIN_USER = "user1"
@@ -48,7 +48,7 @@ if "view_mode" not in st.session_state:
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Team Workspace")
+    st.title("🔐 Login -  Standardization & Evaluation Division")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
