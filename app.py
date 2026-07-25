@@ -79,7 +79,6 @@ else:
     
     with col_nav:
         st.write("")
-        # زر الوصول لأرشيف قاعدة البيانات يظهر للمسؤول فقط
         if is_admin:
             if st.session_state.view_mode == "main":
                 if st.button("🗄️ Database Archive"):
@@ -100,14 +99,14 @@ else:
 
     st.divider()
 
-    # حماية إضافية: إذا حاول أي مستخدم غير مسؤول الانتقال لصفحة الأرشيف يتم تحويله للواجهة الرئيسية فوراً
+    # Protection: Redirect non-admins if they try to access archive mode
     if not is_admin and st.session_state.view_mode == "archive":
         st.session_state.view_mode = "main"
         st.rerun()
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        # نموذج إضافة المهمة يظهر للمسؤول حصراً
+        # Task creation form for Admin
         if is_admin:
             st.subheader("➕ Add New Task")
             with st.form("add_task_form", clear_on_submit=True):
@@ -138,7 +137,6 @@ else:
             if all_tasks:
                 max_id = max(task['id'] for task in all_tasks)
                 
-                # Notification trigger
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
                     if is_admin or new_task['assigned_to'] == current_user:
@@ -146,12 +144,11 @@ else:
                 
                 st.session_state.last_seen_task_id = max_id
 
-                # فلترة المهام للمسؤول بأسماء الموظفين
                 emp_filter = "All"
                 if is_admin:
-                    emp_filter = st.selectbox("Filter Active Tasks by Employee", ["All"] + EMPLOYEES_ONLY)
+                    emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All"] + EMPLOYEES_ONLY)
 
-                # Filter tasks: Active tasks + User visibility
+                # Active tasks list (Employees see their assigned tasks, Admin can see all)
                 active_tasks = []
                 for t in all_tasks:
                     if t['status'] in ["قيد التنفيذ", "In Progress"]:
@@ -176,9 +173,15 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
+                        # يمكن لأي موظف مسجل الدخول الآن إنجاز المهمة
                         if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
-                            supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
-                            st.success("Task completed and archived.")
+                            now_utc = datetime.utcnow().isoformat()
+                            supabase.table("tasks").update({
+                                "status": "Completed",
+                                "completed_by": current_user,
+                                "completed_at": now_utc
+                            }).eq("id", task['id']).execute()
+                            st.success(f"Task completed by {current_user} and archived.")
                             st.rerun()
                 else:
                     st.info("No active tasks found.")
@@ -203,7 +206,7 @@ else:
                 with col_status_f:
                     status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
                 with col_emp_f:
-                    emp_filter = st.selectbox("Filter by Employee", ["All"] + EMPLOYEES_ONLY)
+                    emp_filter = st.selectbox("Filter by Assigned Employee", ["All"] + EMPLOYEES_ONLY)
 
                 filtered_tasks = []
                 for t in all_tasks:
@@ -221,21 +224,33 @@ else:
 
                 if filtered_tasks:
                     for t in filtered_tasks:
-                        col_id, col_title, col_assignee, col_date, col_status, col_act1, col_act2 = st.columns([1, 3, 2, 2, 2, 2, 2])
+                        col_id, col_title, col_assignee, col_completed_info, col_status, col_act1, col_act2 = st.columns([1, 3, 2, 3, 2, 2, 2])
 
                         utc_dt = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
                         gmt3_dt = utc_dt + timedelta(hours=3)
-                        formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
+                        created_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
 
                         col_id.write(f"#{t['id']}")
                         col_title.write(t['title'])
-                        col_assignee.write(f"👤 {t['assigned_to']}")
-                        col_date.write(f"🕒 {formatted_date}")
+                        col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n🕒 {created_date}")
                         
+                        # تفاصيل من قام بالإنجاز والتاريخ
+                        if t.get('completed_by'):
+                            comp_utc = datetime.fromisoformat(t['completed_at'].replace('Z', '+00:00'))
+                            comp_gmt3 = comp_utc + timedelta(hours=3)
+                            completed_date_str = comp_gmt3.strftime("%Y-%m-%d %H:%M")
+                            col_completed_info.write(f"✅ By: **{t['completed_by']}**\n🕒 {completed_date_str}")
+                        else:
+                            col_completed_info.write("—")
+
                         if t['normalized_status'] == "Completed":
                             col_status.success("Completed")
                             if col_act1.button("🔄 Reopen", key=f"btn_reopen_{t['id']}"):
-                                supabase.table("tasks").update({"status": "In Progress"}).eq("id", t['id']).execute()
+                                supabase.table("tasks").update({
+                                    "status": "In Progress",
+                                    "completed_by": None,
+                                    "completed_at": None
+                                }).eq("id", t['id']).execute()
                                 st.success("Task reopened.")
                                 st.rerun()
                         else:
