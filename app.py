@@ -1,6 +1,10 @@
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime, timedelta
+from streamlit_autorun import autorun
+
+# إعادة تحميل الصفحة تلقائياً كل 5000 ميلي ثانية (5 ثوانٍ)
+autorun(interval=5000, key="auto_rerun")
 
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
