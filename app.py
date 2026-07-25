@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. Auto Refresh (يعيد تحميل الصفحة تلقائياً كل 5 ثوانٍ دون أخطاء)
+# 2. Auto Refresh (Every 5 seconds)
 st_autorefresh(interval=5000, key="datarefresh")
 
 # 3. Retrieve Connection Secrets
@@ -27,12 +27,14 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 4. Users List
+# 4. Users List (user1 is the Admin)
 USERS = {
-    "Fadi": "F123",
-    "Hamza": "H123",
-    "Edwan": "E123"
+    "user1": "pass123",
+    "user2": "pass123",
+    "user3": "pass123"
 }
+
+ADMIN_USER = "user1"
 
 # 5. Session State Management
 if "authenticated" not in st.session_state:
@@ -46,7 +48,7 @@ if "view_mode" not in st.session_state:
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Evaluation & Standardization Division")
+    st.title("🔐 Login - Team Workspace")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -66,7 +68,8 @@ else:
     col_user, col_nav, col_logout = st.columns([5, 3, 2])
     
     with col_user:
-        st.title(f"📋 Task Board | Welcome {st.session_state.username}")
+        role_label = " (Admin)" if st.session_state.username == ADMIN_USER else ""
+        st.title(f"📋 Task Board | Welcome, {st.session_state.username}{role_label}")
     
     with col_nav:
         st.write("")
@@ -143,9 +146,12 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        # Only assigned user can complete task
-                        if task['assigned_to'] == st.session_state.username:
-                            if col_action.button("✅ Complete & Archive", key=f"btn_{task['id']}"):
+                        # Admin can complete any task, or assigned user can complete their own task
+                        is_admin = st.session_state.username == ADMIN_USER
+                        is_assigned = task['assigned_to'] == st.session_state.username
+
+                        if is_admin or is_assigned:
+                            if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
                                 supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
                                 st.success("Task moved to database archive.")
                                 st.rerun()
@@ -174,6 +180,9 @@ else:
                 with col_filter:
                     status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
 
+                # Admin Reopen functionality section
+                is_admin = st.session_state.username == ADMIN_USER
+
                 filtered_tasks = []
                 for t in all_tasks:
                     matches_search = search_query.lower() in t['title'].lower()
@@ -186,21 +195,31 @@ else:
                         t_copy['normalized_status'] = task_status
                         filtered_tasks.append(t_copy)
 
-                table_data = []
+                # Display detailed list with Reopen button for Admin
                 for t in filtered_tasks:
+                    col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
+                    
                     utc_dt = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
                     gmt3_dt = utc_dt + timedelta(hours=3)
-                    
-                    table_data.append({
-                        "Task ID": t['id'],
-                        "Title": t['title'],
-                        "Assigned To": t['assigned_to'],
-                        "Created At (GMT+3)": gmt3_dt.strftime("%Y-%m-%d %H:%M:%S"),
-                        "Status": t['normalized_status']
-                    })
+                    formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
 
-                st.dataframe(table_data, use_container_width=True)
-                st.caption(f"Total tasks displayed: {len(table_data)}")
+                    col_id.write(f"#{t['id']}")
+                    col_title.write(t['title'])
+                    col_assignee.write(f"👤 {t['assigned_to']}")
+                    col_date.write(f"🕒 {formatted_date}")
+                    
+                    if t['normalized_status'] == "Completed":
+                        col_status.success("Completed")
+                        # Only Admin can reopen completed tasks
+                        if is_admin:
+                            if col_action.button("🔄 Reopen Task", key=f"btn_reopen_{t['id']}"):
+                                supabase.table("tasks").update({"status": "In Progress"}).eq("id", t['id']).execute()
+                                st.success("Task reopened and moved to Active Board.")
+                                st.rerun()
+                    else:
+                        col_status.warning("In Progress")
+
+                st.caption(f"Total tasks displayed: {len(filtered_tasks)}")
             else:
                 st.info("Database is currently empty.")
                 
