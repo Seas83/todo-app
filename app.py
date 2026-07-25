@@ -111,7 +111,7 @@ else:
                 col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
                 
                 # تنسيق الوقت والتاريخ
-                created_dt = datetime.fromisoformat(task['created_at'].replace('Z', '+00:00'))
+                created_dt = datetime.fromisoformat(task['created_at'].replace('Z', '+03:00'))
                 formatted_date = created_dt.strftime("%Y-%m-%d %H:%M")
 
                 col_id.write(f"#{task['id']}")
