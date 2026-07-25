@@ -5,21 +5,33 @@ from streamlit_autorefresh import st_autorefresh
 
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
-# إخفاء الشريط العلوي والقائمة وشعار Streamlit / GitHub
-hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            header {visibility: hidden;}
-            footer {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
+# 2. CSS لإخفاء الشريط العلوي وجعل العنوان في أعلى ووسط الصفحة
+hide_and_center_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* تقليل المسافة العلوية للصفحة */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0rem !important;
+    }
+    
+    /* محاذاة العنوان في الوسط */
+    .centered-title {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    </style>
+"""
+st.markdown(hide_and_center_style, unsafe_allow_html=True)
 
-# 2. Auto Refresh (Every 5 seconds)
+# 3. Auto Refresh (Every 5 seconds)
 st_autorefresh(interval=5000, key="datarefresh")
 
-# 3. Retrieve Connection Secrets
+# 4. Retrieve Connection Secrets
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
@@ -37,7 +49,7 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 4. Initial Users List
+# 5. Initial Users List
 INITIAL_USERS = {
     "Fadi": "Fadi@1983",  # Admin
     "Hamza": "pass123", # Employee 1
@@ -49,7 +61,7 @@ INITIAL_USERS = {
 
 ADMIN_USER = "Fadi"
 
-# 5. Session State Management
+# 6. Session State Management
 if "user_passwords" not in st.session_state:
     st.session_state.user_passwords = INITIAL_USERS.copy()
 if "authenticated" not in st.session_state:
@@ -67,7 +79,7 @@ EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMI
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Standardization & Evaluation Division")
+    st.markdown("<h1 class='centered-title'>🔐 Login - Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -88,32 +100,30 @@ else:
     is_admin = st.session_state.username == ADMIN_USER
     current_user = st.session_state.username
 
-    col_user, col_pass, col_nav, col_logout = st.columns([4, 2, 2, 2])
-    
-    with col_user:
-        role_label = " (Admin)" if is_admin else ""
-        st.title(f"📋 Task Board | Welcome, {current_user}")
+    # العنوان في منتصف وأعلى الصفحة تماماً
+    role_label = " (Admin)" if is_admin else ""
+    st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
+
+    # أزرار التفاعل والأوامر في شريط أفقي
+    col_pass, col_nav, col_logout = st.columns([1, 1, 1])
     
     with col_pass:
-        st.write("")
-        if st.button("🔑 Change Password"):
+        if st.button("🔑 Change Password", use_container_width=True):
             st.session_state.show_change_pass = not st.session_state.show_change_pass
 
     with col_nav:
-        st.write("")
         if is_admin:
             if st.session_state.view_mode == "main":
-                if st.button("🗄️ Database Archive"):
+                if st.button("🗄️ Database Archive", use_container_width=True):
                     st.session_state.view_mode = "archive"
                     st.rerun()
             else:
-                if st.button("🏠 Back to Main Board"):
+                if st.button("🏠 Back to Main Board", use_container_width=True):
                     st.session_state.view_mode = "main"
                     st.rerun()
 
     with col_logout:
-        st.write("")
-        if st.button("Logout"):
+        if st.button("Logout", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.username = ""
             st.session_state.view_mode = "main"
@@ -186,10 +196,8 @@ else:
                 
                 st.session_state.last_seen_task_id = max_id
 
-                # خيار الفلترة باسم الموظف متاح للجميع الآن مع خيار "All" افتراضياً لرؤية جميع المهام
                 emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All"] + EMPLOYEES_ONLY)
 
-                # عرض جميع المهام النشطة لجميع المستخدمين والموظفين
                 active_tasks = []
                 for t in all_tasks:
                     if t['status'] in ["قيد التنفيذ", "In Progress"]:
@@ -210,7 +218,6 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        # يمكن لأي موظف مسجل الدخول الآن إنجاز أي مهمة ظاهر أمامه
                         if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
                             now_utc = datetime.utcnow().isoformat()
                             supabase.table("tasks").update({
