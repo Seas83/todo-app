@@ -1,15 +1,15 @@
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime, timedelta
-from streamlit_autorun import autorun
-
-# إعادة تحميل الصفحة تلقائياً كل 5000 ميلي ثانية (5 ثوانٍ)
-autorun(interval=5000, key="auto_rerun")
+from streamlit_autorefresh import st_autorefresh
 
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. Retrieve Connection Secrets
+# 2. Auto Refresh (يعيد تحميل الصفحة تلقائياً كل 5 ثوانٍ دون أخطاء)
+st_autorefresh(interval=5000, key="datarefresh")
+
+# 3. Retrieve Connection Secrets
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
@@ -27,14 +27,14 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 3. Users List
+# 4. Users List
 USERS = {
     "user1": "pass123",
     "user2": "pass123",
     "user3": "pass123"
 }
 
-# 4. Session State Management
+# 5. Session State Management
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
@@ -143,8 +143,7 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        # --- التعديل الأساسي هنا ---
-                        # التحقق هل المستخدم الحالي هو نفسه الشخص المخصصة له المهمة أم لا
+                        # Only assigned user can complete task
                         if task['assigned_to'] == st.session_state.username:
                             if col_action.button("✅ Complete & Archive", key=f"btn_{task['id']}"):
                                 supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
