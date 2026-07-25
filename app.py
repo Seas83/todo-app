@@ -5,6 +5,16 @@ from streamlit_autorefresh import st_autorefresh
 
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
+# إخفاء الشريط العلوي والقائمة وشعار Streamlit / GitHub
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            header {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 
 # 2. Auto Refresh (Every 5 seconds)
 st_autorefresh(interval=5000, key="datarefresh")
