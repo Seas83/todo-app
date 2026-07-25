@@ -1,16 +1,16 @@
 import streamlit as st
 from supabase import create_client, Client
+from datetime import datetime
 
-# إعداد الصفحة
-st.set_page_config(page_title="نظام إدارة المهام", page_icon="📋", layout="wide")
+# 1. إعداد الصفحة
+st.set_page_config(page_title="شعبة التقييم والتوحيد", page_icon="📋", layout="wide")
 
-# جلب البيانات من Secrets
+# 2. جلب معلومات الاتصال
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
-# التحقق من وجود البيانات
 if not SUPABASE_URL or not SUPABASE_KEY:
-    st.error("⚠️ يرجى التأكد من إضافة SUPABASE_URL و SUPABASE_KEY في إعدادات Secrets.")
+    st.error("⚠️ يرجى التأكد من إضافة SUPABASE_URL و SUPABASE_KEY في Secrets.")
     st.stop()
 
 @st.cache_resource
@@ -23,22 +23,24 @@ except Exception as e:
     st.error(f"خطأ في الاتصال بقاعدة البيانات: {e}")
     st.stop()
 
-# قائمة المستخدمين
+# 3. قائمة المستخدمين
 USERS = {
     "user1": "pass123",
     "user2": "pass123",
     "user3": "pass123"
 }
 
-# إدارة الجلسة
+# 4. إدارة الجلسة ومتغير التنبيهات
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "last_seen_task_id" not in st.session_state:
+    st.session_state.last_seen_task_id = 0
 
 # --- شاشة تسجيل الدخول ---
 if not st.session_state.authenticated:
-    st.title("🔐 تسجيل الدخول - فريق العمل")
+    st.title("🔐 تسجيل الدخول")
     
     with st.form("login_form"):
         username_input = st.text_input("اسم المستخدم")
@@ -66,7 +68,7 @@ else:
 
     st.divider()
 
-    # إضافة مهمة
+    # قسم إضافة مهمة جديدة
     st.subheader("➕ إضافة مهمة جديدة")
     with st.form("add_task_form", clear_on_submit=True):
         task_title = st.text_input("عنوان المهمة")
@@ -94,26 +96,42 @@ else:
         response = supabase.table("tasks").select("*").order("id", desc=True).execute()
         tasks = response.data
 
-        if not tasks:
-            st.info("لا توجد مهام حالية.")
-        else:
+        if tasks:
+            # التحقق من وجود مهام جديدة لإظهار التنبيه للجميع
+            max_id = max(task['id'] for task in tasks)
+            if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
+                new_task = next(t for t in tasks if t['id'] == max_id)
+                st.toast(f"🔔 مهمة جديدة: '{new_task['title']}' موجهة إلى {new_task['assigned_to']}", icon="🎉")
+            
+            # تحديث رقم آخر مهمة تم الاطلاع عليها
+            st.session_state.last_seen_task_id = max_id
+
+            # عرض المهام في جدول متناسق
             for task in tasks:
-                col_id, col_title, col_assignee, col_status, col_action = st.columns([1, 4, 2, 2, 2])
+                col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
                 
+                # تنسيق الوقت والتاريخ
+                created_dt = datetime.fromisoformat(task['created_at'].replace('Z', '+00:00'))
+                formatted_date = created_dt.strftime("%Y-%m-%d %H:%M")
+
                 col_id.write(f"#{task['id']}")
                 col_title.write(task['title'])
                 col_assignee.write(f"👤 {task['assigned_to']}")
+                col_date.write(f"🕒 {formatted_date}")
                 
-                if task['status'] == "مكتملة":
+                if task['status'] == "مكتمل":
                     col_status.success(task['status'])
                 else:
                     col_status.warning(task['status'])
                     
-                new_status = "مكتملة" if task['status'] == "قيد التنفيذ" else "قيد التنفيذ"
-                btn_label = "تعليم كمكتملة" if task['status'] == "قيد التنفيذ" else "إعادة فتح"
+                new_status = "مكتمل" if task['status'] == "قيد التنفيذ" else "قيد التنفيذ"
+                btn_label = "تعليم مكتمل" if task['status'] == "قيد التنفيذ" else "إعادة فتح"
                 
                 if col_action.button(btn_label, key=f"btn_{task['id']}"):
                     supabase.table("tasks").update({"status": new_status}).eq("id", task['id']).execute()
                     st.rerun()
+        else:
+            st.info("لا توجد مهام حالية.")
+            
     except Exception as e:
         st.error(f"حدث خطأ أثناء جلب المهام: {e}")
