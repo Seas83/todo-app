@@ -34,7 +34,7 @@ USERS = {
     "Edwan": "E@321"
 }
 
-ADMIN_USER = "user1"
+ADMIN_USER = "Fadi"
 
 # 5. Session State Management
 if "authenticated" not in st.session_state:
