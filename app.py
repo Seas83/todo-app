@@ -27,19 +27,21 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 4. Users List (user1 = Admin, user2-user5 = Employees)
-USERS = {
-    "user1": "pass123", # Admin
-    "user2": "pass123", # Employee 1
-    "user3": "pass123", # Employee 2
-    "user4": "pass123", # Employee 3
-    "user5": "pass123"  # Employee 4
+# 4. Initial Users List
+INITIAL_USERS = {
+    "Fadi": "Fadi@1983",  # Admin
+    "Hamza": "pass123", # Employee 1
+    "Edwan": "pass123", # Employee 2
+    "Talal": "pass123", # Employee 3
+    "Momen": "pass123",  # Employee 4
+    "Omar": "pass123" , # Employee 5
 }
 
-ADMIN_USER = "user1"
-EMPLOYEES_ONLY = [u for u in USERS.keys() if u != ADMIN_USER]
+ADMIN_USER = "Fadi"
 
 # 5. Session State Management
+if "user_passwords" not in st.session_state:
+    st.session_state.user_passwords = INITIAL_USERS.copy()
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
@@ -48,10 +50,14 @@ if "last_seen_task_id" not in st.session_state:
     st.session_state.last_seen_task_id = 0
 if "view_mode" not in st.session_state:
     st.session_state.view_mode = "main"
+if "show_change_pass" not in st.session_state:
+    st.session_state.show_change_pass = False
+
+EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMIN_USER]
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Team Workspace")
+    st.title("🔐 Login - Standardization & Evaluation Division")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -59,7 +65,8 @@ if not st.session_state.authenticated:
         submit = st.form_submit_button("Login")
         
         if submit:
-            if username_input in USERS and USERS[username_input] == password_input:
+            users_db = st.session_state.user_passwords
+            if username_input in users_db and users_db[username_input] == password_input:
                 st.session_state.authenticated = True
                 st.session_state.username = username_input
                 st.rerun()
@@ -71,12 +78,17 @@ else:
     is_admin = st.session_state.username == ADMIN_USER
     current_user = st.session_state.username
 
-    col_user, col_nav, col_logout = st.columns([5, 3, 2])
+    col_user, col_pass, col_nav, col_logout = st.columns([4, 2, 2, 2])
     
     with col_user:
         role_label = " (Admin)" if is_admin else ""
-        st.title(f"📋 Task Board | Welcome, {current_user}{role_label}")
+        st.title(f"📋 Task Board | Welcome, {current_user}")
     
+    with col_pass:
+        st.write("")
+        if st.button("🔑 Change Password"):
+            st.session_state.show_change_pass = not st.session_state.show_change_pass
+
     with col_nav:
         st.write("")
         if is_admin:
@@ -95,18 +107,39 @@ else:
             st.session_state.authenticated = False
             st.session_state.username = ""
             st.session_state.view_mode = "main"
+            st.session_state.show_change_pass = False
             st.rerun()
+
+    # --- نافذة تغيير كلمة السر ---
+    if st.session_state.show_change_pass:
+        with st.expander("🔑 Change Your Password", expanded=True):
+            with st.form("change_pass_form"):
+                current_p = st.text_input("Current Password", type="password")
+                new_p = st.text_input("New Password", type="password")
+                confirm_p = st.text_input("Confirm New Password", type="password")
+                pass_submit = st.form_submit_button("Update Password")
+                
+                if pass_submit:
+                    actual_p = st.session_state.user_passwords.get(current_user, "")
+                    if current_p != actual_p:
+                        st.error("Current password is incorrect.")
+                    elif not new_p.strip():
+                        st.warning("New password cannot be empty.")
+                    elif new_p != confirm_p:
+                        st.error("New passwords do not match.")
+                    else:
+                        st.session_state.user_passwords[current_user] = new_p
+                        st.success("Password updated successfully!")
+                        st.session_state.show_change_pass = False
 
     st.divider()
 
-    # Protection: Redirect non-admins if they try to access archive mode
     if not is_admin and st.session_state.view_mode == "archive":
         st.session_state.view_mode = "main"
         st.rerun()
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        # Task creation form for Admin
         if is_admin:
             st.subheader("➕ Add New Task")
             with st.form("add_task_form", clear_on_submit=True):
@@ -148,7 +181,6 @@ else:
                 if is_admin:
                     emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All"] + EMPLOYEES_ONLY)
 
-                # Active tasks list (Employees see their assigned tasks, Admin can see all)
                 active_tasks = []
                 for t in all_tasks:
                     if t['status'] in ["قيد التنفيذ", "In Progress"]:
@@ -173,7 +205,6 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        # يمكن لأي موظف مسجل الدخول الآن إنجاز المهمة
                         if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
                             now_utc = datetime.utcnow().isoformat()
                             supabase.table("tasks").update({
@@ -234,7 +265,6 @@ else:
                         col_title.write(t['title'])
                         col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n🕒 {created_date}")
                         
-                        # تفاصيل من قام بالإنجاز والتاريخ
                         if t.get('completed_by'):
                             comp_utc = datetime.fromisoformat(t['completed_at'].replace('Z', '+00:00'))
                             comp_gmt3 = comp_utc + timedelta(hours=3)
