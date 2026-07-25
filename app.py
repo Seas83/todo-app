@@ -146,7 +146,6 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        # Admin can complete any task, or assigned user can complete their own task
                         is_admin = st.session_state.username == ADMIN_USER
                         is_assigned = task['assigned_to'] == st.session_state.username
 
@@ -180,7 +179,6 @@ else:
                 with col_filter:
                     status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
 
-                # Admin Reopen functionality section
                 is_admin = st.session_state.username == ADMIN_USER
 
                 filtered_tasks = []
@@ -195,9 +193,9 @@ else:
                         t_copy['normalized_status'] = task_status
                         filtered_tasks.append(t_copy)
 
-                # Display detailed list with Reopen button for Admin
                 for t in filtered_tasks:
-                    col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
+                    # تقسيم الأعمدة مع تخصيص مساحة إضافية لأزرار المسؤول
+                    col_id, col_title, col_assignee, col_date, col_status, col_act1, col_act2 = st.columns([1, 3, 2, 2, 2, 2, 2])
                     
                     utc_dt = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
                     gmt3_dt = utc_dt + timedelta(hours=3)
@@ -210,14 +208,20 @@ else:
                     
                     if t['normalized_status'] == "Completed":
                         col_status.success("Completed")
-                        # Only Admin can reopen completed tasks
                         if is_admin:
-                            if col_action.button("🔄 Reopen Task", key=f"btn_reopen_{t['id']}"):
+                            if col_act1.button("🔄 Reopen", key=f"btn_reopen_{t['id']}"):
                                 supabase.table("tasks").update({"status": "In Progress"}).eq("id", t['id']).execute()
-                                st.success("Task reopened and moved to Active Board.")
+                                st.success("Task reopened.")
                                 st.rerun()
                     else:
                         col_status.warning("In Progress")
+
+                    # خيار الحذف النهائي متاح للمسؤول حصراً لكافة المهام
+                    if is_admin:
+                        if col_act2.button("🗑️ Delete", key=f"btn_del_{t['id']}"):
+                            supabase.table("tasks").delete().eq("id", t['id']).execute()
+                            st.warning(f"Task #{t['id']} deleted permanently.")
+                            st.rerun()
 
                 st.caption(f"Total tasks displayed: {len(filtered_tasks)}")
             else:
