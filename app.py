@@ -46,7 +46,7 @@ if "view_mode" not in st.session_state:
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Evaluation and Standardization Section")
+    st.title("🔐 Login - Evaluation & Standardization Division")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
