@@ -85,7 +85,9 @@ if not st.session_state.authenticated:
     
     col_img1, col_img2, col_img3 = st.columns([1, 1, 1])
     with col_img2:
-       st.image("base64_image.png", width=150)
+       col_img1, col_img2, col_img3 = st.columns([1, 1, 1])
+with col_img2:
+    st.image(base64_image, width=120)
     
     st.markdown("<h1 class='centered-title'>Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
     
