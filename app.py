@@ -27,11 +27,11 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 4. Users List (Fadi is the Admin)
+# 4. Users List (user1 is the Admin)
 USERS = {
-    "Fadi": "Fadi@1983",
-    "Hamza": "H@123",
-    "Edwan": "E@123"
+    "user1": "pass123",
+    "user2": "pass123",
+    "user3": "pass123"
 }
 
 ADMIN_USER = "user1"
@@ -48,7 +48,7 @@ if "view_mode" not in st.session_state:
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login -  Standardization & Evaluation Division")
+    st.title("🔐 Login - Team Workspace")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -65,11 +65,14 @@ if not st.session_state.authenticated:
 
 # --- Main Dashboard / Archive View ---
 else:
+    is_admin = st.session_state.username == ADMIN_USER
+    current_user = st.session_state.username
+
     col_user, col_nav, col_logout = st.columns([5, 3, 2])
     
     with col_user:
-        role_label = " (Admin)" if st.session_state.username == ADMIN_USER else ""
-        st.title(f"📋 Task Board | Welcome, {st.session_state.username}{role_label}")
+        role_label = " (Admin)" if is_admin else ""
+        st.title(f"📋 Task Board | Welcome, {current_user}{role_label}")
     
     with col_nav:
         st.write("")
@@ -122,15 +125,19 @@ else:
             if all_tasks:
                 max_id = max(task['id'] for task in all_tasks)
                 
-                # Check for new task notifications
+                # Check for new task notifications (Only if assigned to current user or if Admin)
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
-                    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
+                    if is_admin or new_task['assigned_to'] == current_user:
+                        st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
                 
                 st.session_state.last_seen_task_id = max_id
 
-                # Filter for active tasks
-                active_tasks = [t for t in all_tasks if t['status'] in ["قيد التنفيذ", "In Progress"]]
+                # Filter tasks: Active tasks + User-specific visibility filter
+                active_tasks = [
+                    t for t in all_tasks 
+                    if t['status'] in ["قيد التنفيذ", "In Progress"] and (is_admin or t['assigned_to'] == current_user)
+                ]
 
                 if active_tasks:
                     for task in active_tasks:
@@ -146,18 +153,12 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        is_admin = st.session_state.username == ADMIN_USER
-                        is_assigned = task['assigned_to'] == st.session_state.username
-
-                        if is_admin or is_assigned:
-                            if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
-                                supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
-                                st.success("Task moved to database archive.")
-                                st.rerun()
-                        else:
-                            col_action.caption("🔒 Assigned to " + task['assigned_to'])
+                        if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
+                            supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
+                            st.success("Task moved to database archive.")
+                            st.rerun()
                 else:
-                    st.info("No active tasks at the moment. All tasks are completed and archived.")
+                    st.info("No active tasks found for you at the moment.")
             else:
                 st.info("No tasks found.")
                 
@@ -166,7 +167,7 @@ else:
 
     # === View 2: Full Database Archive View ===
     else:
-        st.subheader("🗄️ Full Database Archive (All Tasks)")
+        st.subheader("🗄️ Database Archive")
         
         try:
             response = supabase.table("tasks").select("*").order("id", desc=True).execute()
@@ -179,12 +180,13 @@ else:
                 with col_filter:
                     status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
 
-                is_admin = st.session_state.username == ADMIN_USER
-
                 filtered_tasks = []
                 for t in all_tasks:
+                    # User-specific visibility filter for archive
+                    if not is_admin and t['assigned_to'] != current_user:
+                        continue
+
                     matches_search = search_query.lower() in t['title'].lower()
-                    
                     task_status = "Completed" if t['status'] in ["مكتملة", "Completed"] else "In Progress"
                     matches_status = (status_filter == "All") or (task_status == status_filter)
                     
@@ -193,37 +195,41 @@ else:
                         t_copy['normalized_status'] = task_status
                         filtered_tasks.append(t_copy)
 
-                for t in filtered_tasks:
-                    # تقسيم الأعمدة مع تخصيص مساحة إضافية لأزرار المسؤول
-                    col_id, col_title, col_assignee, col_date, col_status, col_act1, col_act2 = st.columns([1, 3, 2, 2, 2, 2, 2])
-                    
-                    utc_dt = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
-                    gmt3_dt = utc_dt + timedelta(hours=3)
-                    formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
-
-                    col_id.write(f"#{t['id']}")
-                    col_title.write(t['title'])
-                    col_assignee.write(f"👤 {t['assigned_to']}")
-                    col_date.write(f"🕒 {formatted_date}")
-                    
-                    if t['normalized_status'] == "Completed":
-                        col_status.success("Completed")
+                if filtered_tasks:
+                    for t in filtered_tasks:
                         if is_admin:
-                            if col_act1.button("🔄 Reopen", key=f"btn_reopen_{t['id']}"):
-                                supabase.table("tasks").update({"status": "In Progress"}).eq("id", t['id']).execute()
-                                st.success("Task reopened.")
+                            col_id, col_title, col_assignee, col_date, col_status, col_act1, col_act2 = st.columns([1, 3, 2, 2, 2, 2, 2])
+                        else:
+                            col_id, col_title, col_assignee, col_date, col_status = st.columns([1, 3, 2, 2, 2])
+
+                        utc_dt = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
+                        gmt3_dt = utc_dt + timedelta(hours=3)
+                        formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
+
+                        col_id.write(f"#{t['id']}")
+                        col_title.write(t['title'])
+                        col_assignee.write(f"👤 {t['assigned_to']}")
+                        col_date.write(f"🕒 {formatted_date}")
+                        
+                        if t['normalized_status'] == "Completed":
+                            col_status.success("Completed")
+                            if is_admin:
+                                if col_act1.button("🔄 Reopen", key=f"btn_reopen_{t['id']}"):
+                                    supabase.table("tasks").update({"status": "In Progress"}).eq("id", t['id']).execute()
+                                    st.success("Task reopened.")
+                                    st.rerun()
+                        else:
+                            col_status.warning("In Progress")
+
+                        if is_admin:
+                            if col_act2.button("🗑️ Delete", key=f"btn_del_{t['id']}"):
+                                supabase.table("tasks").delete().eq("id", t['id']).execute()
+                                st.warning(f"Task #{t['id']} deleted permanently.")
                                 st.rerun()
-                    else:
-                        col_status.warning("In Progress")
 
-                    # خيار الحذف النهائي متاح للمسؤول حصراً لكافة المهام
-                    if is_admin:
-                        if col_act2.button("🗑️ Delete", key=f"btn_del_{t['id']}"):
-                            supabase.table("tasks").delete().eq("id", t['id']).execute()
-                            st.warning(f"Task #{t['id']} deleted permanently.")
-                            st.rerun()
-
-                st.caption(f"Total tasks displayed: {len(filtered_tasks)}")
+                    st.caption(f"Total tasks displayed: {len(filtered_tasks)}")
+                else:
+                    st.info("No tasks found in your archive.")
             else:
                 st.info("Database is currently empty.")
                 
