@@ -172,24 +172,19 @@ else:
                 
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
-                    if is_admin or new_task['assigned_to'] == current_user:
-                        st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
+                    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
                 
                 st.session_state.last_seen_task_id = max_id
 
-                emp_filter = "All"
-                if is_admin:
-                    emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All"] + EMPLOYEES_ONLY)
+                # خيار الفلترة باسم الموظف متاح للجميع الآن مع خيار "All" افتراضياً لرؤية جميع المهام
+                emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All"] + EMPLOYEES_ONLY)
 
+                # عرض جميع المهام النشطة لجميع المستخدمين والموظفين
                 active_tasks = []
                 for t in all_tasks:
                     if t['status'] in ["قيد التنفيذ", "In Progress"]:
-                        if is_admin:
-                            if emp_filter == "All" or t['assigned_to'] == emp_filter:
-                                active_tasks.append(t)
-                        else:
-                            if t['assigned_to'] == current_user:
-                                active_tasks.append(t)
+                        if emp_filter == "All" or t['assigned_to'] == emp_filter:
+                            active_tasks.append(t)
 
                 if active_tasks:
                     for task in active_tasks:
@@ -205,6 +200,7 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
+                        # يمكن لأي موظف مسجل الدخول الآن إنجاز أي مهمة ظاهر أمامه
                         if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
                             now_utc = datetime.utcnow().isoformat()
                             supabase.table("tasks").update({
