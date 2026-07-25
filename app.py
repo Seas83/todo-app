@@ -139,11 +139,15 @@ else:
                         col_date.write(f"🕒 {formatted_date}")
                         col_status.warning("In Progress")
                         
-                        # Complete & Archive Button
-                        if col_action.button("✅ Complete & Archive", key=f"btn_{task['id']}"):
-                            supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
-                            st.success("Task moved to database archive.")
-                            st.rerun()
+                        # --- التعديل الأساسي هنا ---
+                        # التحقق هل المستخدم الحالي هو نفسه الشخص المخصصة له المهمة أم لا
+                        if task['assigned_to'] == st.session_state.username:
+                            if col_action.button("✅ Complete & Archive", key=f"btn_{task['id']}"):
+                                supabase.table("tasks").update({"status": "Completed"}).eq("id", task['id']).execute()
+                                st.success("Task moved to database archive.")
+                                st.rerun()
+                        else:
+                            col_action.caption("🔒 Assigned to " + task['assigned_to'])
                 else:
                     st.info("No active tasks at the moment. All tasks are completed and archived.")
             else:
@@ -171,7 +175,6 @@ else:
                 for t in all_tasks:
                     matches_search = search_query.lower() in t['title'].lower()
                     
-                    # Normalizing status text for older entries
                     task_status = "Completed" if t['status'] in ["مكتملة", "Completed"] else "In Progress"
                     matches_status = (status_filter == "All") or (task_status == status_filter)
                     
