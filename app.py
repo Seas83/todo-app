@@ -29,9 +29,9 @@ except Exception as e:
 
 # 4. Users List
 USERS = {
-    "user1": "pass123",
-    "user2": "pass123",
-    "user3": "pass123"
+    "Fadi": "F123",
+    "Hamza": "H123",
+    "Edwan": "E123"
 }
 
 # 5. Session State Management
@@ -46,7 +46,7 @@ if "view_mode" not in st.session_state:
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Team Workspace")
+    st.title("🔐 Login - Evaluation and Standardization Section")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -66,7 +66,7 @@ else:
     col_user, col_nav, col_logout = st.columns([5, 3, 2])
     
     with col_user:
-        st.title(f"📋 Task Board | Welcome, {st.session_state.username}")
+        st.title(f"📋 Task Board | Welcome {st.session_state.username}")
     
     with col_nav:
         st.write("")
