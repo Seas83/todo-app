@@ -29,12 +29,12 @@ except Exception as e:
 
 # 4. Users List (user1 is the Admin)
 USERS = {
-    "Fadi": "Fadi@1983",
-    "Hamza": "H@123",
-    "Edwan": "E@321"
+    "user1": "pass123",
+    "user2": "pass123",
+    "user3": "pass123"
 }
 
-ADMIN_USER = "Fadi"
+ADMIN_USER = "user1"
 
 # 5. Session State Management
 if "authenticated" not in st.session_state:
@@ -48,7 +48,7 @@ if "view_mode" not in st.session_state:
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    st.title("🔐 Login - Standardization & Evaluation Division")
+    st.title("🔐 Login - Team Workspace")
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -97,25 +97,28 @@ else:
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        st.subheader("➕ Add New Task")
-        with st.form("add_task_form", clear_on_submit=True):
-            task_title = st.text_input("Task Title")
-            assigned_user = st.selectbox("Assign To", list(USERS.keys()))
-            add_submit = st.form_submit_button("Add Task")
-            
-            if add_submit:
-                if task_title.strip():
-                    supabase.table("tasks").insert({
-                        "title": task_title,
-                        "assigned_to": assigned_user,
-                        "status": "In Progress"
-                    }).execute()
-                    st.success("Task added successfully!")
-                    st.rerun()
-                else:
-                    st.warning("Please enter a task title.")
+        # نموذج إضافة المهمة يظهر حصراً للمسؤول (Admin Only)
+        if is_admin:
+            st.subheader("➕ Add New Task")
+            with st.form("add_task_form", clear_on_submit=True):
+                task_title = st.text_input("Task Title")
+                assigned_user = st.selectbox("Assign To", list(USERS.keys()))
+                add_submit = st.form_submit_button("Add Task")
+                
+                if add_submit:
+                    if task_title.strip():
+                        supabase.table("tasks").insert({
+                            "title": task_title,
+                            "assigned_to": assigned_user,
+                            "status": "In Progress"
+                        }).execute()
+                        st.success("Task added successfully!")
+                        st.rerun()
+                    else:
+                        st.warning("Please enter a task title.")
 
-        st.divider()
+            st.divider()
+
         st.subheader("📌 Active Tasks (In Progress)")
         
         try:
