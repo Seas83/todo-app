@@ -27,14 +27,18 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 4. Users List (user1 is the Admin)
+# 4. Users List (user1 = Admin, user2-user5 = Employees)
 USERS = {
-    "user1": "pass123",
-    "user2": "pass123",
-    "user3": "pass123"
+    "user1": "pass123", # Admin
+    "user2": "pass123", # Employee 1
+    "user3": "pass123", # Employee 2
+    "user4": "pass123", # Employee 3
+    "user5": "pass123"  # Employee 4
 }
 
 ADMIN_USER = "user1"
+# قائمة الموظفين المتاح تعيين المهام لهم (تستثني المسؤول)
+EMPLOYEES_ONLY = [u for u in USERS.keys() if u != ADMIN_USER]
 
 # 5. Session State Management
 if "authenticated" not in st.session_state:
@@ -97,12 +101,12 @@ else:
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        # نموذج إضافة المهمة يظهر حصراً للمسؤول (Admin Only)
+        # نموذج إضافة المهمة يظهر للمسؤول حصراً (مع قائمة الموظفين فقط)
         if is_admin:
             st.subheader("➕ Add New Task")
             with st.form("add_task_form", clear_on_submit=True):
                 task_title = st.text_input("Task Title")
-                assigned_user = st.selectbox("Assign To", list(USERS.keys()))
+                assigned_user = st.selectbox("Assign To", EMPLOYEES_ONLY)
                 add_submit = st.form_submit_button("Add Task")
                 
                 if add_submit:
@@ -128,7 +132,7 @@ else:
             if all_tasks:
                 max_id = max(task['id'] for task in all_tasks)
                 
-                # Check for new task notifications (Only if assigned to current user or if Admin)
+                # Notification trigger
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
                     if is_admin or new_task['assigned_to'] == current_user:
@@ -136,11 +140,21 @@ else:
                 
                 st.session_state.last_seen_task_id = max_id
 
-                # Filter tasks: Active tasks + User-specific visibility filter
-                active_tasks = [
-                    t for t in all_tasks 
-                    if t['status'] in ["قيد التنفيذ", "In Progress"] and (is_admin or t['assigned_to'] == current_user)
-                ]
+                # فلترة المهام للمسؤول بأسماء الموظفين
+                emp_filter = "All"
+                if is_admin:
+                    emp_filter = st.selectbox("Filter Active Tasks by Employee", ["All"] + EMPLOYEES_ONLY)
+
+                # Filter tasks: Active tasks + User visibility
+                active_tasks = []
+                for t in all_tasks:
+                    if t['status'] in ["قيد التنفيذ", "In Progress"]:
+                        if is_admin:
+                            if emp_filter == "All" or t['assigned_to'] == emp_filter:
+                                active_tasks.append(t)
+                        else:
+                            if t['assigned_to'] == current_user:
+                                active_tasks.append(t)
 
                 if active_tasks:
                     for task in active_tasks:
@@ -161,7 +175,7 @@ else:
                             st.success("Task moved to database archive.")
                             st.rerun()
                 else:
-                    st.info("No active tasks found for you at the moment.")
+                    st.info("No active tasks found.")
             else:
                 st.info("No tasks found.")
                 
@@ -177,16 +191,28 @@ else:
             all_tasks = response.data
 
             if all_tasks:
-                col_search, col_filter = st.columns([3, 1])
-                with col_search:
-                    search_query = st.text_input("🔍 Search task title...", "")
-                with col_filter:
-                    status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
+                if is_admin:
+                    col_search, col_status_f, col_emp_f = st.columns([2, 1, 1])
+                    with col_search:
+                        search_query = st.text_input("🔍 Search task title...", "")
+                    with col_status_f:
+                        status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
+                    with col_emp_f:
+                        emp_filter = st.selectbox("Filter by Employee", ["All"] + EMPLOYEES_ONLY)
+                else:
+                    col_search, col_status_f = st.columns([3, 1])
+                    with col_search:
+                        search_query = st.text_input("🔍 Search task title...", "")
+                    with col_status_f:
+                        status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
+                    emp_filter = current_user
 
                 filtered_tasks = []
                 for t in all_tasks:
-                    # User-specific visibility filter for archive
+                    # User-specific visibility filter
                     if not is_admin and t['assigned_to'] != current_user:
+                        continue
+                    if is_admin and emp_filter != "All" and t['assigned_to'] != emp_filter:
                         continue
 
                     matches_search = search_query.lower() in t['title'].lower()
@@ -232,7 +258,7 @@ else:
 
                     st.caption(f"Total tasks displayed: {len(filtered_tasks)}")
                 else:
-                    st.info("No tasks found in your archive.")
+                    st.info("No tasks found in archive.")
             else:
                 st.info("Database is currently empty.")
                 
