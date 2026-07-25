@@ -38,7 +38,7 @@ if "username" not in st.session_state:
 if "last_seen_task_id" not in st.session_state:
     st.session_state.last_seen_task_id = 0
 if "view_mode" not in st.session_state:
-    st.session_state.view_mode = "main"  # "main" أو "archive"
+    st.session_state.view_mode = "main"
 
 # --- شاشة تسجيل الدخول ---
 if not st.session_state.authenticated:
@@ -59,14 +59,13 @@ if not st.session_state.authenticated:
 
 # --- الشاشة الرئيسية / الأرشيف ---
 else:
-    # الشريط العلوي مع أزرار التنقل
     col_user, col_nav, col_logout = st.columns([5, 3, 2])
     
     with col_user:
         st.title(f"📋 لوحة المهام | أهلاً {st.session_state.username}")
     
     with col_nav:
-        st.write("") # للمحاذاة
+        st.write("")
         if st.session_state.view_mode == "main":
             if st.button("🗄️ أرشيف قاعدة البيانات"):
                 st.session_state.view_mode = "archive"
@@ -86,7 +85,7 @@ else:
 
     st.divider()
 
-    # === العرض 1: الشاشة الرئيسية (إضافة وعرض المهام الحالية) ===
+    # === العرض 1: الشاشة الرئيسية (تقتصر على المهام قيد التنفيذ) ===
     if st.session_state.view_mode == "main":
         st.subheader("➕ إضافة مهمة جديدة")
         with st.form("add_task_form", clear_on_submit=True):
@@ -107,66 +106,68 @@ else:
                     st.warning("يرجى كتابة عنوان للمهمة.")
 
         st.divider()
-        st.subheader("📌 المهام الحالية")
+        st.subheader("📌 المهام النشطة (قيد التنفيذ)")
         
         try:
+            # جلب المهام المخزنة
             response = supabase.table("tasks").select("*").order("id", desc=True).execute()
-            tasks = response.data
+            all_tasks = response.data
 
-            if tasks:
-                max_id = max(task['id'] for task in tasks)
+            if all_tasks:
+                max_id = max(task['id'] for task in all_tasks)
+                
+                # فحص التنبيهات للمهام الجديدة
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
-                    new_task = next(t for t in tasks if t['id'] == max_id)
+                    new_task = next(t for t in all_tasks if t['id'] == max_id)
                     st.toast(f"🔔 مهمة جديدة: '{new_task['title']}' موجهة إلى {new_task['assigned_to']}", icon="🎉")
                 
                 st.session_state.last_seen_task_id = max_id
 
-                for task in tasks:
-                    col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
-                    
-                    utc_dt = datetime.fromisoformat(task['created_at'].replace('Z', '+00:00'))
-                    gmt3_dt = utc_dt + timedelta(hours=3)
-                    formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
+                # تصفية المهام لعرض "قيد التنفيذ" فقط في الواجهة الرئيسية
+                active_tasks = [t for t in all_tasks if t['status'] == "قيد التنفيذ"]
 
-                    col_id.write(f"#{task['id']}")
-                    col_title.write(task['title'])
-                    col_assignee.write(f"👤 {task['assigned_to']}")
-                    col_date.write(f"🕒 {formatted_date}")
-                    
-                    if task['status'] == "مكتملة":
-                        col_status.success(task['status'])
-                    else:
+                if active_tasks:
+                    for task in active_tasks:
+                        col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
+                        
+                        utc_dt = datetime.fromisoformat(task['created_at'].replace('Z', '+00:00'))
+                        gmt3_dt = utc_dt + timedelta(hours=3)
+                        formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
+
+                        col_id.write(f"#{task['id']}")
+                        col_title.write(task['title'])
+                        col_assignee.write(f"👤 {task['assigned_to']}")
+                        col_date.write(f"🕒 {formatted_date}")
                         col_status.warning(task['status'])
                         
-                    new_status = "مكتملة" if task['status'] == "قيد التنفيذ" else "قيد التنفيذ"
-                    btn_label = "تعليم كمكتملة" if task['status'] == "قيد التنفيذ" else "إعادة فتح"
-                    
-                    if col_action.button(btn_label, key=f"btn_{task['id']}"):
-                        supabase.table("tasks").update({"status": new_status}).eq("id", task['id']).execute()
-                        st.rerun()
+                        # زر تحويل المهمة لمكتملة وأرشفتها فوراً
+                        if col_action.button("✅ إكمال وأرشفة", key=f"btn_{task['id']}"):
+                            supabase.table("tasks").update({"status": "مكتملة"}).eq("id", task['id']).execute()
+                            st.success("تم نقل المهمة إلى أرشيف قاعدة البيانات.")
+                            st.rerun()
+                else:
+                    st.info("لا توجد مهام نشطة حالياً. جميع المهام مكتملة ومؤرشفة.")
             else:
                 st.info("لا توجد مهام حالية.")
                 
         except Exception as e:
             st.error(f"حدث خطأ أثناء جلب المهام: {e}")
 
-    # === العرض 2: واجهة أرشيف قاعدة البيانات الكاملة ===
+    # === العرض 2: أرشيف قاعدة البيانات (يعرض الجميع مع إمكانية إلغاء الأرشفة) ===
     else:
-        st.subheader("🗄️ قاعدة البيانات الكاملة (جميع المهمات السابقة)")
+        st.subheader("🗄️ قاعدة البيانات الكاملة (جميع المهمات)")
         
         try:
             response = supabase.table("tasks").select("*").order("id", desc=True).execute()
             all_tasks = response.data
 
             if all_tasks:
-                # خيارات البحث والفلترة
                 col_search, col_filter = st.columns([3, 1])
                 with col_search:
                     search_query = st.text_input("🔍 بحث في عنوان المهمة...", "")
                 with col_filter:
                     status_filter = st.selectbox("تصفية حسب الحالة", ["الكل", "قيد التنفيذ", "مكتملة"])
 
-                # تطبيق الفلترة
                 filtered_tasks = []
                 for t in all_tasks:
                     matches_search = search_query.lower() in t['title'].lower()
@@ -174,7 +175,6 @@ else:
                     if matches_search and matches_status:
                         filtered_tasks.append(t)
 
-                # تجهيز البيانات للعرض في جدول منظم
                 table_data = []
                 for t in filtered_tasks:
                     utc_dt = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
