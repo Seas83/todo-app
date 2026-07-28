@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. CSS لإخفاء الشريط العلوي، وتوسيط العنوان، وإخفاء أيقونات وشعار Streamlit العائم تماماً
+# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -81,6 +81,8 @@ if "view_mode" not in st.session_state:
     st.session_state.view_mode = "main"
 if "show_change_pass" not in st.session_state:
     st.session_state.show_change_pass = False
+if "audio_enabled" not in st.session_state:
+    st.session_state.audio_enabled = False
 
 EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMIN_USER]
 
@@ -117,11 +119,20 @@ else:
     role_label = " (Admin)" if is_admin else ""
     st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
-    col_pass, col_nav, col_logout = st.columns([1, 1, 1])
+    col_pass, col_audio, col_nav, col_logout = st.columns([1, 1, 1, 1])
     
     with col_pass:
         if st.button("🔑 Change Password", use_container_width=True):
             st.session_state.show_change_pass = not st.session_state.show_change_pass
+
+    with col_audio:
+        if not st.session_state.audio_enabled:
+            if st.button("🔔 تفعيل التنبيه الصوتي", use_container_width=True):
+                st.session_state.audio_enabled = True
+                st.success("تم تفعيل الصوت بنجاح!")
+                st.rerun()
+        else:
+            st.button("🔊 الصوت مفعل", disabled=True, use_container_width=True)
 
     with col_nav:
         if is_admin:
@@ -140,6 +151,7 @@ else:
             st.session_state.username = ""
             st.session_state.view_mode = "main"
             st.session_state.show_change_pass = False
+            st.session_state.audio_enabled = False
             st.rerun()
 
     # --- نافذة تغيير كلمة السر ---
@@ -239,12 +251,14 @@ else:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
                     st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
                     
-                    sound_script = """
-                        <audio autoplay>
-                          <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-                        </audio>
-                    """
-                    st.markdown(sound_script, unsafe_allow_html=True)
+                    # تشغيل الصوت فقط إذا قام المستخدم بتفعيل الزر
+                    if st.session_state.audio_enabled:
+                        sound_script = """
+                            <audio autoplay>
+                              <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                            </audio>
+                        """
+                        st.markdown(sound_script, unsafe_allow_html=True)
                 
                 st.session_state.last_seen_task_id = max_id
 
