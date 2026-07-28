@@ -142,17 +142,6 @@ else:
             st.session_state.show_change_pass = False
             st.rerun()
 
-    # --- مشغل صوت مرئي مدمج (يعمل بانتظام على الهواتف عند الضغط عليه مرة واحدة لفك حظر الصوت) ---
-    st.markdown("""
-        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">
-            <p style="margin: 0 0 5px 0; font-size: 14px; color: #31333F; font-weight: bold;">📱 اضغط على زر (شغل/Play) أدناه لتفعيل الصوت على الهاتف:</p>
-            <audio controls style="width: 100%; max-width: 400px;">
-              <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-              متصفحك لا يدعم مشغل الصوت.
-            </audio>
-        </div>
-    """, unsafe_allow_html=True)
-
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
         with st.expander("🔑 Change Your Password", expanded=True):
@@ -249,20 +238,6 @@ else:
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
                     st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
-                    
-                    # إعادة تشغيل المشغل تلقائياً عند وصول مهمة جديدة
-                    sound_script = """
-                        <script>
-                            var audioElements = parent.document.getElementsByTagName('audio');
-                            if(audioElements.length > 0) {
-                                audioElements[0].currentTime = 0;
-                                audioElements[0].play().catch(function(error) {
-                                    console.log("Audio play blocked by browser policy");
-                                });
-                            }
-                        </script>
-                    """
-                    st.markdown(sound_script, unsafe_allow_html=True)
                 
                 st.session_state.last_seen_task_id = max_id
 
