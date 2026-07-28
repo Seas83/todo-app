@@ -239,7 +239,7 @@ else:
     except:
         current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها."
 
-    with st.expander("📌 الأوامر والتعليمات (اضغط للعرض/الإخفاء)", expanded=False):
+    with st.expander("📌الأوامر والتعليمات ", expanded=False):
         if is_admin:
             with st.form("update_instructions_form"):
                 updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=120)
