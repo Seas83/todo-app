@@ -102,7 +102,7 @@ if not st.session_state.authenticated:
         except:
             st.warning("⚠️ Logo image 'logo.png' not found.")
 
-    st.markdown("<h1 class='centered-title'>Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='centered-title'>Stan & Eval Division</h1>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -124,7 +124,7 @@ else:
     current_user = st.session_state.username
 
     role_label = " (Admin)" if is_admin else ""
-    st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='centered-title'>📋  Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
     col_pass, col_nav, col_logout = st.columns([1, 1, 1])
     
