@@ -244,7 +244,7 @@ else:
     except:
         current_instructions = "- متابعة المهام بانتظام."
 
-    with st.expander("📌 الأوامر والتعليمات (اضغط للعرض/الإخفاء)", expanded=False):
+    with st.expander("📌 الأوامر والتعليمات ", expanded=False):
         if is_admin:
             with st.form("update_instructions_form"):
                 updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=120)
@@ -307,7 +307,7 @@ else:
                 
                 st.session_state.last_seen_task_id = max_id
 
-                emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All", "عام (بدون تخصيص)"] + EMPLOYEES_ONLY)
+                emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All", "عام "] + EMPLOYEES_ONLY)
 
                 active_tasks = []
                 for t in all_tasks:
@@ -381,7 +381,7 @@ else:
                 with col_status_f:
                     status_filter = st.selectbox("Filter by Status", ["All", "Pending", "In Progress", "Completed"])
                 with col_emp_f:
-                    emp_filter = st.selectbox("Filter by Assigned Employee", ["All", "عام (بدون تخصيص)"] + EMPLOYEES_ONLY)
+                    emp_filter = st.selectbox("Filter by Assigned Employee", ["All", "عام "] + EMPLOYEES_ONLY)
 
                 filtered_tasks = []
                 for t in all_tasks:
