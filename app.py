@@ -66,11 +66,6 @@ except Exception as e:
 # 5. Initial Users List
 INITIAL_USERS = {
     "Fadi": "Fadi@1983",  # Admin
-    "Hamza": "pass123", # Employee 1
-    "Edwan": "pass123", # Employee 2
-    "Talal": "pass123", # Employee 3
-    "Momen": "pass123",  # Employee 4
-    "Omar": "pass123" , # Employee 5
 }
 
 ADMIN_USER = "Fadi"
@@ -102,7 +97,7 @@ if not st.session_state.authenticated:
         except:
             st.warning("⚠️ Logo image 'logo.png' not found.")
 
-    st.markdown("<h1 class='centered-title'>Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='centered-title'>Stan & Eval Division</h1>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -124,7 +119,7 @@ else:
     current_user = st.session_state.username
 
     role_label = " (Admin)" if is_admin else ""
-    st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='centered-title'>📋Welcome {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
     if is_admin:
         col_pass, col_adduser, col_nav, col_logout = st.columns([1, 1, 1, 1])
@@ -229,10 +224,10 @@ else:
     except:
         current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها."
 
-    with st.expander("📌 التعليمات والتوجهـــــات الثابتة (اضغط للعرض/الإخفاء)", expanded=False):
+    with st.expander("📌 الأوامر والتعليمات (اضغط للعرض/الإخفاء)", expanded=False):
         if is_admin:
             with st.form("update_instructions_form"):
-                updated_text = st.text_area("تعديل التعليمات (تظهر للجميع بشكل نقاط):", value=current_instructions, height=120)
+                updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=120)
                 update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
                 if update_btn:
                     try:
@@ -261,7 +256,7 @@ else:
             st.subheader("➕ Add New Task")
             with st.form("add_task_form", clear_on_submit=True):
                 task_title = st.text_input("Task Title")
-                assigned_user = st.selectbox("Assign To", ["عام (بدون تخصيص)"] + EMPLOYEES_ONLY)
+                assigned_user = st.selectbox("Assign To", ["عام "] + EMPLOYEES_ONLY)
                 add_submit = st.form_submit_button("Add Task")
                 
                 if add_submit:
