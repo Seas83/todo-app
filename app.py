@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان
+# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان والشعار
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -30,6 +30,14 @@ hide_and_center_style = """
     .centered-title {
         text-align: center;
         margin-bottom: 20px;
+    }
+
+    /* توسيط الصورة داخل العمود الخاص بها */
+    div[data-testid="column"] {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
     }
     </style>
 """
@@ -86,12 +94,13 @@ EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMI
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    col_img1, col_img2, col_img3 = st.columns([1, 1, 1])
-    with col_img2:
+    # استخدام أعمدة متساوية لدفع الشعار والعنوان إلى المنتصف تماماً
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_m:
         try:
-            st.image("logo.png", width=120)
+            st.image("logo.png", width=130)
         except:
-            pass
+            st.warning("⚠️ Logo image 'logo.png' not found.")
 
     st.markdown("<h1 class='centered-title'>Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
     
