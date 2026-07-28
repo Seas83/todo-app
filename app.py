@@ -6,15 +6,17 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. CSS لإخفاء الشريط العلوي، وتوسيط العنوان، وإخفاء أداة Streamlit
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
     
+    /* إخفاء أداة وشعار Streamlit وأيقونة القارب والتحكم */
     [data-testid="stDecoration"] {visibility: hidden;}
     div[class*="viewerBadge"] {visibility: hidden;}
+    #stStatusWidget {visibility: hidden; display: none;}
+    .stAppToolbar {visibility: hidden; display: none;}
     
     .block-container {
         padding-top: 1rem !important;
