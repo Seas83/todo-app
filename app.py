@@ -6,17 +6,27 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
+# 2. CSS لإخفاء الشريط العلوي، وتوسيط العنوان، وإخفاء أيقونات وشعار Streamlit العائم تماماً
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* إخفاء أداة وشعار Streamlit وأيقونة القارب والتحكم */
-    [data-testid="stDecoration"] {visibility: hidden;}
-    div[class*="viewerBadge"] {visibility: hidden;}
-    #stStatusWidget {visibility: hidden; display: none;}
-    .stAppToolbar {visibility: hidden; display: none;}
+    /* إخفاء تام لأيقونة Streamlit والقارب وأدوات الـ Viewer العائمة في الأسفل والأعلى */
+    [data-testid="stDecoration"] {display: none !important; visibility: hidden !important;}
+    div[class*="viewerBadge"] {display: none !important; visibility: hidden !important;}
+    #stStatusWidget {display: none !important; visibility: hidden !important;}
+    .stAppToolbar {display: none !important; visibility: hidden !important;}
+    footer[data-testid="stFooter"] {display: none !important; visibility: hidden !important;}
+    
+    /* إخفاء أي عنصر عائم يحتوي على أيقونة Streamlit أو القارب */
+    div.row-widget.stButton > button (since it might target general buttons, we use specific attributes) {}
+    iframe[sandbox] {display: none !important;}
+    
+    /* إخفاء الـ badges وزر التبليغ أو القارب السفلي */
+    a[href*="streamlit.cloud"] {display: none !important;}
+    .builtWith {display: none !important;}
     
     .block-container {
         padding-top: 1rem !important;
@@ -164,7 +174,6 @@ else:
 
     # --- إدارة وعرض التعليمات الثابتة (من قاعدة البيانات) ---
     try:
-        # جلب التعليمات من جدول settings أو إنشاء قيمة افتراضية
         settings_res = supabase.table("settings").select("*").eq("key", "instructions").execute()
         current_instructions = ""
         if settings_res.data:
@@ -181,7 +190,6 @@ else:
                 update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
                 if update_btn:
                     try:
-                        # التحقق هل الجدول يحتوي على مفتاح instructions مسبقاً أم لا
                         check_exist = supabase.table("settings").select("*").eq("key", "instructions").execute()
                         if check_exist.data:
                             supabase.table("settings").update({"value": updated_text}).eq("key", "instructions").execute()
@@ -190,11 +198,9 @@ else:
                         st.success("تم تحديث التعليمات بنجاح!")
                         st.rerun()
                     except Exception as err:
-                        # إذا لم يتم إنشاء جدول settings في قاعدة البيانات بعد، نقوم بتنبيه المدير
                         st.error(f"خطأ في حفظ التعليمات (تأكد من إنشاء جدول settings في Supabase): {err}")
             st.divider()
         
-        # عرض التعليمات لجميع المستخدمين
         st.markdown(current_instructions)
 
     st.divider()
