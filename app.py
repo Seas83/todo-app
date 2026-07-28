@@ -71,7 +71,6 @@ def get_users_from_db():
         res = supabase.table("users").select("*").execute()
         users_dict = {}
         if res.data:
-            # ترتيب المستخدمين أبجدياً وتجاهل حالة الأحرف (حتى يظهر Hamza وجميع الأسماء بشكل صحيح)
             sorted_rows = sorted(res.data, key=lambda x: x["username"].strip().lower())
             for row in sorted_rows:
                 users_dict[row["username"].strip()] = row["password"]
@@ -285,6 +284,7 @@ else:
                     supabase.table("tasks").insert({
                         "title": task_title,
                         "assigned_to": assigned_user,
+                        "created_by": current_user,  # حفظ اسم من قام بإضافة المهمة
                         "status": "Pending"
                     }).execute()
                     st.success("Task added successfully!")
@@ -408,7 +408,10 @@ else:
 
                         col_id.write(f"#{t['id']}")
                         col_title.write(t['title'])
-                        col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n🕒 Created: {created_date}")
+                        
+                        # إظهار من أضاف المهمة ومن مُسندة إليه وتاريخ الإنشاء
+                        creator = t.get('created_by', 'غير معروف')
+                        col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n✍️ Added by: **{creator}**\n🕒 Created: {created_date}")
                         
                         info_text = "—"
                         started_user = t.get('started_by')
