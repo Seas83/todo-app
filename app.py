@@ -187,7 +187,7 @@ else:
     with st.expander("📌  الأوامر والتعليمات", expanded=False):
         if is_admin:
             with st.form("update_instructions_form"):
-                updated_text = st.text_area("تعديل التعليمات (تظهر للجميع بشكل نقاط):", value=current_instructions, height=120)
+                updated_text = st.text_area( value=current_instructions, height=120)
                 update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
                 if update_btn:
                     try:
