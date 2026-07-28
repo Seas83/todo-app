@@ -95,7 +95,7 @@ current_users_db = get_users_from_db()
 EMPLOYEES_ONLY = [u for u in current_users_db.keys() if u != ADMIN_USER]
 
 # --- Login Screen ---
-if not st.session_state.authenticated:
+if not st.session_state.get("authenticated", False):
     col_l, col_m, col_r = st.columns([1, 2, 1])
     with col_m:
         try:
@@ -111,6 +111,7 @@ if not st.session_state.authenticated:
         submit = st.form_submit_button("Login")
         
         if submit:
+            current_users_db = get_users_from_db()
             if username_input in current_users_db and current_users_db[username_input] == password_input:
                 st.session_state.authenticated = True
                 st.session_state.username = username_input
