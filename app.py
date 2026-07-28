@@ -78,11 +78,18 @@ def get_users_from_db():
     except:
         return {"Fadi": "Fadi@1983"}
 
-# 5. Session State Management
+# 5. Session State Management with URL persistence to prevent random logouts
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+
+# التحقق من الرابط لضمان عدم ضياع الجلسة عند التحديث
+query_params = st.query_params
+if "logged_user" in query_params and not st.session_state.authenticated:
+    st.session_state.authenticated = True
+    st.session_state.username = query_params["logged_user"]
+
 if "last_seen_task_id" not in st.session_state:
     st.session_state.last_seen_task_id = 0
 if "view_mode" not in st.session_state:
@@ -115,6 +122,7 @@ if not st.session_state.get("authenticated", False):
             if username_input in current_users_db and current_users_db[username_input] == password_input:
                 st.session_state.authenticated = True
                 st.session_state.username = username_input
+                st.query_params["logged_user"] = username_input
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
@@ -158,6 +166,8 @@ else:
         if st.button("Logout", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.username = ""
+            if "logged_user" in st.query_params:
+                del st.query_params["logged_user"]
             st.session_state.view_mode = "main"
             st.session_state.show_change_pass = False
             st.session_state.show_add_user = False
@@ -284,7 +294,7 @@ else:
                     supabase.table("tasks").insert({
                         "title": task_title,
                         "assigned_to": assigned_user,
-                        "created_by": current_user,  # حفظ اسم من قام بإضافة المهمة
+                        "created_by": current_user,
                         "status": "Pending"
                     }).execute()
                     st.success("Task added successfully!")
@@ -409,7 +419,6 @@ else:
                         col_id.write(f"#{t['id']}")
                         col_title.write(t['title'])
                         
-                        # إظهار من أضاف المهمة ومن مُسندة إليه وتاريخ الإنشاء
                         creator = t.get('created_by', 'غير معروف')
                         col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n✍️ Added by: **{creator}**\n🕒 Created: {created_date}")
                         
