@@ -13,18 +13,12 @@ hide_and_center_style = """
     header {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* إخفاء تام لأيقونة Streamlit والقارب وأدوات الـ Viewer العائمة في الأسفل والأعلى */
     [data-testid="stDecoration"] {display: none !important; visibility: hidden !important;}
     div[class*="viewerBadge"] {display: none !important; visibility: hidden !important;}
     #stStatusWidget {display: none !important; visibility: hidden !important;}
     .stAppToolbar {display: none !important; visibility: hidden !important;}
     footer[data-testid="stFooter"] {display: none !important; visibility: hidden !important;}
     
-    /* إخفاء أي عنصر عائم يحتوي على أيقونة Streamlit أو القارب */
-    div.row-widget.stButton > button (since it might target general buttons, we use specific attributes) {}
-    iframe[sandbox] {display: none !important;}
-    
-    /* إخفاء الـ badges وزر التبليغ أو القارب السفلي */
     a[href*="streamlit.cloud"] {display: none !important;}
     .builtWith {display: none !important;}
     
@@ -241,17 +235,16 @@ else:
             if all_tasks:
                 max_id = max(task['id'] for task in all_tasks)
                 
-            if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
-    new_task = next(t for t in all_tasks if t['id'] == max_id)
-    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
-    
-    # كود JavaScript لتوليد صوت رنة تنبيه عبر المتصفح تلقائياً
-    sound_script = """
-        <audio autoplay>
-          <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-        </audio>
-    """
-    st.markdown(sound_script, unsafe_allow_html=True)
+                if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
+                    new_task = next(t for t in all_tasks if t['id'] == max_id)
+                    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
+                    
+                    sound_script = """
+                        <audio autoplay>
+                          <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                        </audio>
+                    """
+                    st.markdown(sound_script, unsafe_allow_html=True)
                 
                 st.session_state.last_seen_task_id = max_id
 
