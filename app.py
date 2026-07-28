@@ -65,7 +65,7 @@ except Exception as e:
 
 ADMIN_USER = "Fadi"
 
-# جلب المستخدمين من قاعدة البيانات
+# جلب المستخدمين مع كلمات المرور من قاعدة البيانات
 def get_users_from_db():
     try:
         res = supabase.table("users").select("*").execute()
@@ -162,9 +162,9 @@ else:
             st.session_state.show_add_user = False
             st.rerun()
 
-    # --- نافذة إدارة الموظفين (إضافة وحذف موظف) ---
+    # --- نافذة إدارة الموظفين (إضافة، حذف، وعرض كلمات السر للأدمن) ---
     if is_admin and st.session_state.show_add_user:
-        with st.expander("👥 Employee Management (Add / Delete)", expanded=True):
+        with st.expander("👥 Employee Management (Add / Delete / View Passwords)", expanded=True):
             st.subheader("➕ Add New Employee")
             with st.form("add_user_form"):
                 new_username = st.text_input("New Username")
@@ -186,6 +186,11 @@ else:
                             st.rerun()
                         except Exception as err:
                             st.error(f"Error adding user: {err}")
+
+            st.divider()
+            st.subheader("🔑 View All Users & Passwords")
+            for uname, upass in current_users_db.items():
+                st.text(f"User: {uname}  |  Password: {upass}")
 
             st.divider()
             st.subheader("🗑️ Existing Employees List")
@@ -267,7 +272,6 @@ else:
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        # تم السماح للأدمن وجميع الموظفين بإضافة مهام جديدة
         st.subheader("➕ Add New Task")
         with st.form("add_task_form", clear_on_submit=True):
             task_title = st.text_input("Task Title")
@@ -402,17 +406,28 @@ else:
 
                         col_id.write(f"#{t['id']}")
                         col_title.write(t['title'])
-                        col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n🕒 {created_date}")
+                        col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n🕒 Created: {created_date}")
                         
-                        if t.get('completed_by'):
-                            comp_utc = datetime.fromisoformat(t['completed_at'].replace('Z', '+00:00'))
+                        # تفصيل من بدأ ومتى، ومن أنهى ومتى
+                        info_text = "—"
+                        started_user = t.get('started_by')
+                        completed_user = t.get('completed_by')
+                        completed_at_raw = t.get('completed_at')
+
+                        details_list = []
+                        if started_user:
+                            details_list.append(f"⏳ Started by: **{started_user}**")
+                        
+                        if completed_user and completed_at_raw:
+                            comp_utc = datetime.fromisoformat(completed_at_raw.replace('Z', '+00:00'))
                             comp_gmt3 = comp_utc + timedelta(hours=3)
                             completed_date_str = comp_gmt3.strftime("%Y-%m-%d %H:%M")
-                            col_completed_info.write(f"✅ By: **{t['completed_by']}**\n🕒 {completed_date_str}")
-                        elif t.get('started_by'):
-                            col_completed_info.write(f"⏳ Started by: **{t['started_by']}**")
-                        else:
-                            col_completed_info.write("—")
+                            details_list.append(f"✅ Ended by: **{completed_user}**\n🕒 End Time: {completed_date_str}")
+                        
+                        if details_list:
+                            info_text = "\n".join(details_list)
+
+                        col_completed_info.markdown(info_text)
 
                         t_status = t.get('status', 'Pending')
                         if t_status == "Completed":
