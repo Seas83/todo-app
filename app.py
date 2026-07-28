@@ -241,9 +241,17 @@ else:
             if all_tasks:
                 max_id = max(task['id'] for task in all_tasks)
                 
-                if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
-                    new_task = next(t for t in all_tasks if t['id'] == max_id)
-                    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
+            if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
+    new_task = next(t for t in all_tasks if t['id'] == max_id)
+    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
+    
+    # كود JavaScript لتوليد صوت رنة تنبيه عبر المتصفح تلقائياً
+    sound_script = """
+        <audio autoplay>
+          <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        </audio>
+    """
+    st.markdown(sound_script, unsafe_allow_html=True)
                 
                 st.session_state.last_seen_task_id = max_id
 
