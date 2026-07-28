@@ -160,14 +160,40 @@ else:
 
     st.divider()
 
-    # --- لوحة التعليمات الثابتة (تظهر لجميع المستخدمين بشكل نقاط تحت بعض) ---
+    # --- إدارة وعرض التعليمات الثابتة (من قاعدة البيانات) ---
+    try:
+        # جلب التعليمات من جدول settings أو إنشاء قيمة افتراضية
+        settings_res = supabase.table("settings").select("*").eq("key", "instructions").execute()
+        current_instructions = ""
+        if settings_res.data:
+            current_instructions = settings_res.data[0]["value"]
+        else:
+            current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها.\n- يتم تحديث الصفحة تلقائياً كل 5 ثوانٍ."
+    except:
+        current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها."
+
     with st.expander("📌 التعليمات والتوجهـــــات الثابتة (اضغط للعرض/الإخفاء)", expanded=False):
-        st.markdown("""
-        * **متابعة المهام:** يجب على جميع الموظفين مراجعة المهام النشطة بانتظام وإنجازها بالسرعة الممكنة.
-        * **المهام العامة:** المهام غير المخصصة لموظف معين تعتبر عامة، ويمكن لأي زميل المبادرة بإنجازها.
-        * **التحديث التلقائي:** يتم تحديث الصفحة وعرض المهام الجديدة تلقائياً كل 5 ثوانٍ.
-        * **السرية والأمان:** يرجى عدم مشاركة بيانات الدخول وتغيير كلمة السر الشخصية بشكل دوري.
-        """)
+        if is_admin:
+            with st.form("update_instructions_form"):
+                updated_text = st.text_area("تعديل التعليمات (تظهر للجميع بشكل نقاط):", value=current_instructions, height=120)
+                update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
+                if update_btn:
+                    try:
+                        # التحقق هل الجدول يحتوي على مفتاح instructions مسبقاً أم لا
+                        check_exist = supabase.table("settings").select("*").eq("key", "instructions").execute()
+                        if check_exist.data:
+                            supabase.table("settings").update({"value": updated_text}).eq("key", "instructions").execute()
+                        else:
+                            supabase.table("settings").insert({"key": "instructions", "value": updated_text}).execute()
+                        st.success("تم تحديث التعليمات بنجاح!")
+                        st.rerun()
+                    except Exception as err:
+                        # إذا لم يتم إنشاء جدول settings في قاعدة البيانات بعد، نقوم بتنبيه المدير
+                        st.error(f"خطأ في حفظ التعليمات (تأكد من إنشاء جدول settings في Supabase): {err}")
+            st.divider()
+        
+        # عرض التعليمات لجميع المستخدمين
+        st.markdown(current_instructions)
 
     st.divider()
 
@@ -181,7 +207,6 @@ else:
             st.subheader("➕ Add New Task")
             with st.form("add_task_form", clear_on_submit=True):
                 task_title = st.text_input("Task Title")
-                # إضافة خيار "عام (بدون تخصيص)" بجانب أسماء الموظفين
                 assigned_user = st.selectbox("Assign To", ["عام (بدون تخصيص)"] + EMPLOYEES_ONLY)
                 add_submit = st.form_submit_button("Add Task")
                 
@@ -233,7 +258,6 @@ else:
                         col_id.write(f"#{task['id']}")
                         col_title.write(task['title'])
                         
-                        # تمييز شكل العرض للمهام العامة غير المخصصة
                         assignee_display = task['assigned_to']
                         if assignee_display == "عام (بدون تخصيص)":
                             col_assignee.markdown("🌐 **مهمة عامة**")
