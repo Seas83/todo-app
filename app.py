@@ -81,8 +81,6 @@ if "view_mode" not in st.session_state:
     st.session_state.view_mode = "main"
 if "show_change_pass" not in st.session_state:
     st.session_state.show_change_pass = False
-if "audio_enabled" not in st.session_state:
-    st.session_state.audio_enabled = False
 
 EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMIN_USER]
 
@@ -119,20 +117,11 @@ else:
     role_label = " (Admin)" if is_admin else ""
     st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
-    col_pass, col_audio, col_nav, col_logout = st.columns([1, 1, 1, 1])
+    col_pass, col_nav, col_logout = st.columns([1, 1, 1])
     
     with col_pass:
         if st.button("🔑 Change Password", use_container_width=True):
             st.session_state.show_change_pass = not st.session_state.show_change_pass
-
-    with col_audio:
-        if not st.session_state.audio_enabled:
-            if st.button("🔔 تفعيل التنبيه الصوتي", use_container_width=True):
-                st.session_state.audio_enabled = True
-                st.success("تم تفعيل الصوت بنجاح!")
-                st.rerun()
-        else:
-            st.button("🔊 الصوت مفعل", disabled=True, use_container_width=True)
 
     with col_nav:
         if is_admin:
@@ -151,8 +140,18 @@ else:
             st.session_state.username = ""
             st.session_state.view_mode = "main"
             st.session_state.show_change_pass = False
-            st.session_state.audio_enabled = False
             st.rerun()
+
+    # --- مشغل صوت مرئي مدمج (يعمل بانتظام على الهواتف عند الضغط عليه مرة واحدة لفك حظر الصوت) ---
+    st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">
+            <p style="margin: 0 0 5px 0; font-size: 14px; color: #31333F; font-weight: bold;">📱 اضغط على زر (شغل/Play) أدناه لتفعيل الصوت على الهاتف:</p>
+            <audio controls style="width: 100%; max-width: 400px;">
+              <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+              متصفحك لا يدعم مشغل الصوت.
+            </audio>
+        </div>
+    """, unsafe_allow_html=True)
 
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
@@ -251,14 +250,19 @@ else:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
                     st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
                     
-                    # تشغيل الصوت فقط إذا قام المستخدم بتفعيل الزر
-                    if st.session_state.audio_enabled:
-                        sound_script = """
-                            <audio autoplay>
-                              <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-                            </audio>
-                        """
-                        st.markdown(sound_script, unsafe_allow_html=True)
+                    # إعادة تشغيل المشغل تلقائياً عند وصول مهمة جديدة
+                    sound_script = """
+                        <script>
+                            var audioElements = parent.document.getElementsByTagName('audio');
+                            if(audioElements.length > 0) {
+                                audioElements[0].currentTime = 0;
+                                audioElements[0].play().catch(function(error) {
+                                    console.log("Audio play blocked by browser policy");
+                                });
+                            }
+                        </script>
+                    """
+                    st.markdown(sound_script, unsafe_allow_html=True)
                 
                 st.session_state.last_seen_task_id = max_id
 
