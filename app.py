@@ -88,6 +88,8 @@ if "view_mode" not in st.session_state:
     st.session_state.view_mode = "main"
 if "show_change_pass" not in st.session_state:
     st.session_state.show_change_pass = False
+if "show_add_user" not in st.session_state:
+    st.session_state.show_add_user = False
 
 EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMIN_USER]
 
@@ -100,7 +102,7 @@ if not st.session_state.authenticated:
         except:
             st.warning("⚠️ Logo image 'logo.png' not found.")
 
-    st.markdown("<h1 class='centered-title'>Stan & Eval Division</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='centered-title'>Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -122,13 +124,23 @@ else:
     current_user = st.session_state.username
 
     role_label = " (Admin)" if is_admin else ""
-    st.markdown(f"<h1 class='centered-title'>📋 Welcome {current_user}{role_label}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
-    col_pass, col_nav, col_logout = st.columns([1, 1, 1])
+    if is_admin:
+        col_pass, col_adduser, col_nav, col_logout = st.columns([1, 1, 1, 1])
+    else:
+        col_pass, col_nav, col_logout = st.columns([1, 1, 1])
     
     with col_pass:
         if st.button("🔑 Change Password", use_container_width=True):
             st.session_state.show_change_pass = not st.session_state.show_change_pass
+            st.session_state.show_add_user = False
+
+    if is_admin:
+        with col_adduser:
+            if st.button("👤 Add New User", use_container_width=True):
+                st.session_state.show_add_user = not st.session_state.show_add_user
+                st.session_state.show_change_pass = False
 
     with col_nav:
         if is_admin:
@@ -147,7 +159,30 @@ else:
             st.session_state.username = ""
             st.session_state.view_mode = "main"
             st.session_state.show_change_pass = False
+            st.session_state.show_add_user = False
             st.rerun()
+
+    # --- نافذة إضافة موظف جديد (للمدير فقط) ---
+    if is_admin and st.session_state.show_add_user:
+        with st.expander("👤 Add New Employee / User", expanded=True):
+            with st.form("add_user_form"):
+                new_username = st.text_input("New Username")
+                new_password = st.text_input("Password", type="password")
+                add_user_submit = st.form_submit_button("Create User")
+                
+                if add_user_submit:
+                    clean_name = new_username.strip()
+                    if not clean_name:
+                        st.warning("Username cannot be empty.")
+                    elif clean_name in st.session_state.user_passwords:
+                        st.error("User already exists.")
+                    elif not new_password.strip():
+                        st.warning("Password cannot be empty.")
+                    else:
+                        st.session_state.user_passwords[clean_name] = new_password
+                        st.success(f"User '{clean_name}' added successfully!")
+                        st.session_state.show_add_user = False
+                        st.rerun()
 
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
@@ -184,10 +219,10 @@ else:
     except:
         current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها."
 
-    with st.expander("📌  الأوامر والتعليمات", expanded=False):
+    with st.expander("📌 التعليمات والتوجهـــــات الثابتة (اضغط للعرض/الإخفاء)", expanded=False):
         if is_admin:
             with st.form("update_instructions_form"):
-                updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=120)
+                updated_text = st.text_area("تعديل التعليمات (تظهر للجميع بشكل نقاط):", value=current_instructions, height=120)
                 update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
                 if update_btn:
                     try:
@@ -224,7 +259,7 @@ else:
                         supabase.table("tasks").insert({
                             "title": task_title,
                             "assigned_to": assigned_user,
-                            "status": "Pending"  # تبدأ كمعلقة حتى يبدأها الموظف
+                            "status": "Pending"
                         }).execute()
                         st.success("Task added successfully!")
                         st.rerun()
@@ -252,7 +287,6 @@ else:
 
                 active_tasks = []
                 for t in all_tasks:
-                    # عرض المهام التي لم تكتمل بعد (Pending أو In Progress)
                     task_st = t.get('status', 'Pending')
                     if task_st not in ["Completed", "مكتملة"]:
                         if emp_filter == "All" or t['assigned_to'] == emp_filter:
@@ -280,10 +314,8 @@ else:
                         current_status = task.get('status', 'Pending')
                         started_by = task.get('started_by')
 
-                        # عرض حالة المهمة بناءً على المرحلة
                         if current_status in ["In Progress", "قيد التنفيذ"]:
                             col_status.warning(f"In Progress\n(By: {started_by})")
-                            # الزر يتحول لمرحلة الانتهاء
                             if col_action.button("✅ Complete Task", key=f"btn_comp_{task['id']}"):
                                 now_utc = datetime.utcnow().isoformat()
                                 supabase.table("tasks").update({
@@ -295,7 +327,6 @@ else:
                                 st.rerun()
                         else:
                             col_status.info("Pending")
-                            # الزر في مرحلة البدء
                             if col_action.button("⏳ Start Task", key=f"btn_start_{task['id']}"):
                                 supabase.table("tasks").update({
                                     "status": "In Progress",
