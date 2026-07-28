@@ -63,16 +63,21 @@ except Exception as e:
     st.error(f"Database connection error: {e}")
     st.stop()
 
-# 5. Initial Users List
-INITIAL_USERS = {
-    "Fadi": "Fadi@1983",  # Admin
-}
-
 ADMIN_USER = "Fadi"
 
-# 6. Session State Management
-if "user_passwords" not in st.session_state:
-    st.session_state.user_passwords = INITIAL_USERS.copy()
+# جلب المستخدمين من قاعدة البيانات مباشرة
+def get_users_from_db():
+    try:
+        res = supabase.table("users").select("*").execute()
+        users_dict = {}
+        if res.data:
+            for row in res.data:
+                users_dict[row["username"]] = row["password"]
+        return users_dict
+    except:
+        return {"Fadi": "Fadi@1983"}
+
+# 5. Session State Management
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
@@ -86,7 +91,8 @@ if "show_change_pass" not in st.session_state:
 if "show_add_user" not in st.session_state:
     st.session_state.show_add_user = False
 
-EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMIN_USER]
+current_users_db = get_users_from_db()
+EMPLOYEES_ONLY = [u for u in current_users_db.keys() if u != ADMIN_USER]
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
@@ -105,8 +111,7 @@ if not st.session_state.authenticated:
         submit = st.form_submit_button("Login")
         
         if submit:
-            users_db = st.session_state.user_passwords
-            if username_input in users_db and users_db[username_input] == password_input:
+            if username_input in current_users_db and current_users_db[username_input] == password_input:
                 st.session_state.authenticated = True
                 st.session_state.username = username_input
                 st.rerun()
@@ -170,14 +175,17 @@ else:
                     clean_name = new_username.strip()
                     if not clean_name:
                         st.warning("Username cannot be empty.")
-                    elif clean_name in st.session_state.user_passwords:
+                    elif clean_name in current_users_db:
                         st.error("User already exists.")
                     elif not new_password.strip():
                         st.warning("Password cannot be empty.")
                     else:
-                        st.session_state.user_passwords[clean_name] = new_password
-                        st.success(f"User '{clean_name}' added successfully!")
-                        st.rerun()
+                        try:
+                            supabase.table("users").insert({"username": clean_name, "password": new_password}).execute()
+                            st.success(f"User '{clean_name}' added successfully to database!")
+                            st.rerun()
+                        except Exception as err:
+                            st.error(f"Error adding user: {err}")
 
             st.divider()
             st.subheader("🗑️ Existing Employees List")
@@ -185,9 +193,12 @@ else:
                 c_name, c_btn = st.columns([3, 1])
                 c_name.write(f"👤 **{emp}**")
                 if c_btn.button(f"🗑️ Delete", key=f"del_user_{emp}"):
-                    del st.session_state.user_passwords[emp]
-                    st.warning(f"Employee '{emp}' deleted successfully!")
-                    st.rerun()
+                    try:
+                        supabase.table("users").delete().eq("username", emp).execute()
+                        st.warning(f"Employee '{emp}' deleted successfully!")
+                        st.rerun()
+                    except Exception as err:
+                        st.error(f"Error deleting user: {err}")
 
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
@@ -199,7 +210,7 @@ else:
                 pass_submit = st.form_submit_button("Update Password")
                 
                 if pass_submit:
-                    actual_p = st.session_state.user_passwords.get(current_user, "")
+                    actual_p = current_users_db.get(current_user, "")
                     if current_p != actual_p:
                         st.error("Current password is incorrect.")
                     elif not new_p.strip():
@@ -207,9 +218,13 @@ else:
                     elif new_p != confirm_p:
                         st.error("New passwords do not match.")
                     else:
-                        st.session_state.user_passwords[current_user] = new_p
-                        st.success("Password updated successfully!")
-                        st.session_state.show_change_pass = False
+                        try:
+                            supabase.table("users").update({"password": new_p}).eq("username", current_user).execute()
+                            st.success("Password updated successfully in database!")
+                            st.session_state.show_change_pass = False
+                            st.rerun()
+                        except Exception as err:
+                            st.error(f"Error updating password: {err}")
 
     st.divider()
 
@@ -309,7 +324,7 @@ else:
                         col_title.write(task['title'])
                         
                         assignee_display = task['assigned_to']
-                        if assignee_display == "عام (بدون تخصيص)":
+                        if assignee_display == "عام ":
                             col_assignee.markdown("🌐 **مهمة عامة**")
                         else:
                             col_assignee.write(f"👤 {assignee_display}")
