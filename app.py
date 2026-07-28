@@ -65,7 +65,7 @@ except Exception as e:
 
 ADMIN_USER = "Fadi"
 
-# جلب المستخدمين من قاعدة البيانات مباشرة
+# جلب المستخدمين من قاعدة البيانات
 def get_users_from_db():
     try:
         res = supabase.table("users").select("*").execute()
@@ -111,7 +111,6 @@ if not st.session_state.get("authenticated", False):
         submit = st.form_submit_button("Login")
         
         if submit:
-            current_users_db = get_users_from_db()
             if username_input in current_users_db and current_users_db[username_input] == password_input:
                 st.session_state.authenticated = True
                 st.session_state.username = username_input
@@ -236,11 +235,11 @@ else:
         if settings_res.data:
             current_instructions = settings_res.data[0]["value"]
         else:
-            current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها على مرحلتين (بدء ثم إتمام).\n- يتم تحديث الصفحة تلقائياً كل 5 ثوانٍ."
+            current_instructions = "- متابعة المهام بانتظام.\n- يمكن لأي مستخدم إضافة أو إنجاز المهام على مرحلتين.\n- يتم تحديث الصفحة تلقائياً كل 5 ثوانٍ."
     except:
-        current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها."
+        current_instructions = "- متابعة المهام بانتظام."
 
-    with st.expander("📌الأوامر والتعليمات ", expanded=False):
+    with st.expander("📌 الأوامر والتعليمات (اضغط للعرض/الإخفاء)", expanded=False):
         if is_admin:
             with st.form("update_instructions_form"):
                 updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=120)
@@ -255,7 +254,7 @@ else:
                         st.success("تم تحديث التعليمات بنجاح!")
                         st.rerun()
                     except Exception as err:
-                        st.error(f"خطأ في حفظ التعليمات (تأكد من إنشاء جدول settings في Supabase): {err}")
+                        st.error(f"خطأ في حفظ التعليمات: {err}")
             st.divider()
         
         st.markdown(current_instructions)
@@ -268,26 +267,26 @@ else:
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        if is_admin:
-            st.subheader("➕ Add New Task")
-            with st.form("add_task_form", clear_on_submit=True):
-                task_title = st.text_input("Task Title")
-                assigned_user = st.selectbox("Assign To", ["عام "] + EMPLOYEES_ONLY)
-                add_submit = st.form_submit_button("Add Task")
-                
-                if add_submit:
-                    if task_title.strip():
-                        supabase.table("tasks").insert({
-                            "title": task_title,
-                            "assigned_to": assigned_user,
-                            "status": "Pending"
-                        }).execute()
-                        st.success("Task added successfully!")
-                        st.rerun()
-                    else:
-                        st.warning("Please enter a task title.")
+        # تم السماح للأدمن وجميع الموظفين بإضافة مهام جديدة
+        st.subheader("➕ Add New Task")
+        with st.form("add_task_form", clear_on_submit=True):
+            task_title = st.text_input("Task Title")
+            assigned_user = st.selectbox("Assign To", ["عام "] + EMPLOYEES_ONLY)
+            add_submit = st.form_submit_button("Add Task")
+            
+            if add_submit:
+                if task_title.strip():
+                    supabase.table("tasks").insert({
+                        "title": task_title,
+                        "assigned_to": assigned_user,
+                        "status": "Pending"
+                    }).execute()
+                    st.success("Task added successfully!")
+                    st.rerun()
+                else:
+                    st.warning("Please enter a task title.")
 
-            st.divider()
+        st.divider()
 
         st.subheader("📌 Active Tasks Board")
         
