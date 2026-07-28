@@ -138,7 +138,7 @@ else:
 
     if is_admin:
         with col_adduser:
-            if st.button("👤 Add New User", use_container_width=True):
+            if st.button("👥 Manage Employees", use_container_width=True):
                 st.session_state.show_add_user = not st.session_state.show_add_user
                 st.session_state.show_change_pass = False
 
@@ -162,9 +162,10 @@ else:
             st.session_state.show_add_user = False
             st.rerun()
 
-    # --- نافذة إضافة موظف جديد (للمدير فقط) ---
+    # --- نافذة إدارة الموظفين (إضافة وحذف موظف) ---
     if is_admin and st.session_state.show_add_user:
-        with st.expander("👤 Add New Employee / User", expanded=True):
+        with st.expander("👥 Employee Management (Add / Delete)", expanded=True):
+            st.subheader("➕ Add New Employee")
             with st.form("add_user_form"):
                 new_username = st.text_input("New Username")
                 new_password = st.text_input("Password", type="password")
@@ -181,8 +182,17 @@ else:
                     else:
                         st.session_state.user_passwords[clean_name] = new_password
                         st.success(f"User '{clean_name}' added successfully!")
-                        st.session_state.show_add_user = False
                         st.rerun()
+
+            st.divider()
+            st.subheader("🗑️ Existing Employees List")
+            for emp in EMPLOYEES_ONLY:
+                c_name, c_btn = st.columns([3, 1])
+                c_name.write(f"👤 **{emp}**")
+                if c_btn.button(f"🗑️ Delete", key=f"del_user_{emp}"):
+                    del st.session_state.user_passwords[emp]
+                    st.warning(f"Employee '{emp}' deleted successfully!")
+                    st.rerun()
 
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
