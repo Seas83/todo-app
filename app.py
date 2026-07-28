@@ -65,14 +65,16 @@ except Exception as e:
 
 ADMIN_USER = "Fadi"
 
-# جلب المستخدمين مع كلمات المرور من قاعدة البيانات
+# جلب المستخدمين مع كلمات المرور من قاعدة البيانات وترتيبهم أبجدياً بدقة
 def get_users_from_db():
     try:
         res = supabase.table("users").select("*").execute()
         users_dict = {}
         if res.data:
-            for row in res.data:
-                users_dict[row["username"]] = row["password"]
+            # ترتيب المستخدمين أبجدياً وتجاهل حالة الأحرف (حتى يظهر Hamza وجميع الأسماء بشكل صحيح)
+            sorted_rows = sorted(res.data, key=lambda x: x["username"].strip().lower())
+            for row in sorted_rows:
+                users_dict[row["username"].strip()] = row["password"]
         return users_dict
     except:
         return {"Fadi": "Fadi@1983"}
@@ -408,7 +410,6 @@ else:
                         col_title.write(t['title'])
                         col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n🕒 Created: {created_date}")
                         
-                        # تفصيل من بدأ ومتى، ومن أنهى ومتى
                         info_text = "—"
                         started_user = t.get('started_by')
                         completed_user = t.get('completed_by')
