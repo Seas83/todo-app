@@ -32,7 +32,6 @@ hide_and_center_style = """
         margin-bottom: 20px;
     }
 
-    /* توسيط الصورة داخل العمود الخاص بها */
     div[data-testid="column"] {
         display: flex;
         flex-direction: column;
@@ -94,7 +93,6 @@ EMPLOYEES_ONLY = [u for u in st.session_state.user_passwords.keys() if u != ADMI
 
 # --- Login Screen ---
 if not st.session_state.authenticated:
-    # استخدام أعمدة متساوية لدفع الشعار والعنوان إلى المنتصف تماماً
     col_l, col_m, col_r = st.columns([1, 2, 1])
     with col_m:
         try:
@@ -102,7 +100,7 @@ if not st.session_state.authenticated:
         except:
             st.warning("⚠️ Logo image 'logo.png' not found.")
 
-    st.markdown("<h1 class='centered-title'>Stan & Eval Division</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='centered-title'>Standardization & Evaluation Division</h1>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Username")
@@ -124,7 +122,7 @@ else:
     current_user = st.session_state.username
 
     role_label = " (Admin)" if is_admin else ""
-    st.markdown(f"<h1 class='centered-title'>📋  Welcome {current_user}{role_label}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='centered-title'>📋 Task Board | Welcome, {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
     col_pass, col_nav, col_logout = st.columns([1, 1, 1])
     
@@ -182,7 +180,7 @@ else:
         if settings_res.data:
             current_instructions = settings_res.data[0]["value"]
         else:
-            current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها.\n- يتم تحديث الصفحة تلقائياً كل 5 ثوانٍ."
+            current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها على مرحلتين (بدء ثم إتمام).\n- يتم تحديث الصفحة تلقائياً كل 5 ثوانٍ."
     except:
         current_instructions = "- متابعة المهام بانتظام.\n- المهام العامة يمكن لأي موظف إنجازها."
 
@@ -226,7 +224,7 @@ else:
                         supabase.table("tasks").insert({
                             "title": task_title,
                             "assigned_to": assigned_user,
-                            "status": "In Progress"
+                            "status": "Pending"  # تبدأ كمعلقة حتى يبدأها الموظف
                         }).execute()
                         st.success("Task added successfully!")
                         st.rerun()
@@ -235,7 +233,7 @@ else:
 
             st.divider()
 
-        st.subheader("📌 Active Tasks (In Progress)")
+        st.subheader("📌 Active Tasks Board")
         
         try:
             response = supabase.table("tasks").select("*").order("id", desc=True).execute()
@@ -254,7 +252,9 @@ else:
 
                 active_tasks = []
                 for t in all_tasks:
-                    if t['status'] in ["قيد التنفيذ", "In Progress"]:
+                    # عرض المهام التي لم تكتمل بعد (Pending أو In Progress)
+                    task_st = t.get('status', 'Pending')
+                    if task_st not in ["Completed", "مكتملة"]:
                         if emp_filter == "All" or t['assigned_to'] == emp_filter:
                             active_tasks.append(t)
 
@@ -276,17 +276,33 @@ else:
                             col_assignee.write(f"👤 {assignee_display}")
                             
                         col_date.write(f"🕒 {formatted_date}")
-                        col_status.warning("In Progress")
                         
-                        if col_action.button("✅ Complete & Archive", key=f"btn_comp_{task['id']}"):
-                            now_utc = datetime.utcnow().isoformat()
-                            supabase.table("tasks").update({
-                                "status": "Completed",
-                                "completed_by": current_user,
-                                "completed_at": now_utc
-                            }).eq("id", task['id']).execute()
-                            st.success(f"Task completed by {current_user} and archived.")
-                            st.rerun()
+                        current_status = task.get('status', 'Pending')
+                        started_by = task.get('started_by')
+
+                        # عرض حالة المهمة بناءً على المرحلة
+                        if current_status in ["In Progress", "قيد التنفيذ"]:
+                            col_status.warning(f"In Progress\n(By: {started_by})")
+                            # الزر يتحول لمرحلة الانتهاء
+                            if col_action.button("✅ Complete Task", key=f"btn_comp_{task['id']}"):
+                                now_utc = datetime.utcnow().isoformat()
+                                supabase.table("tasks").update({
+                                    "status": "Completed",
+                                    "completed_by": current_user,
+                                    "completed_at": now_utc
+                                }).eq("id", task['id']).execute()
+                                st.success(f"Task completed by {current_user} and archived.")
+                                st.rerun()
+                        else:
+                            col_status.info("Pending")
+                            # الزر في مرحلة البدء
+                            if col_action.button("⏳ Start Task", key=f"btn_start_{task['id']}"):
+                                supabase.table("tasks").update({
+                                    "status": "In Progress",
+                                    "started_by": current_user
+                                }).eq("id", task['id']).execute()
+                                st.success(f"Task started by {current_user}.")
+                                st.rerun()
                 else:
                     st.info("No active tasks found.")
             else:
@@ -308,7 +324,7 @@ else:
                 with col_search:
                     search_query = st.text_input("🔍 Search task title...", "")
                 with col_status_f:
-                    status_filter = st.selectbox("Filter by Status", ["All", "In Progress", "Completed"])
+                    status_filter = st.selectbox("Filter by Status", ["All", "Pending", "In Progress", "Completed"])
                 with col_emp_f:
                     emp_filter = st.selectbox("Filter by Assigned Employee", ["All", "عام (بدون تخصيص)"] + EMPLOYEES_ONLY)
 
@@ -318,13 +334,12 @@ else:
                         continue
 
                     matches_search = search_query.lower() in t['title'].lower()
-                    task_status = "Completed" if t['status'] in ["مكتملة", "Completed"] else "In Progress"
-                    matches_status = (status_filter == "All") or (task_status == status_filter)
+                    t_status = t.get('status', 'Pending')
+                    
+                    matches_status = (status_filter == "All") or (t_status == status_filter)
                     
                     if matches_search and matches_status:
-                        t_copy = dict(t)
-                        t_copy['normalized_status'] = task_status
-                        filtered_tasks.append(t_copy)
+                        filtered_tasks.append(t)
 
                 if filtered_tasks:
                     for t in filtered_tasks:
@@ -343,21 +358,29 @@ else:
                             comp_gmt3 = comp_utc + timedelta(hours=3)
                             completed_date_str = comp_gmt3.strftime("%Y-%m-%d %H:%M")
                             col_completed_info.write(f"✅ By: **{t['completed_by']}**\n🕒 {completed_date_str}")
+                        elif t.get('started_by'):
+                            col_completed_info.write(f"⏳ Started by: **{t['started_by']}**")
                         else:
                             col_completed_info.write("—")
 
-                        if t['normalized_status'] == "Completed":
+                        t_status = t.get('status', 'Pending')
+                        if t_status == "Completed":
                             col_status.success("Completed")
                             if col_act1.button("🔄 Reopen", key=f"btn_reopen_{t['id']}"):
                                 supabase.table("tasks").update({
-                                    "status": "In Progress",
+                                    "status": "Pending",
+                                    "started_by": None,
                                     "completed_by": None,
                                     "completed_at": None
                                 }).eq("id", t['id']).execute()
                                 st.success("Task reopened.")
                                 st.rerun()
-                        else:
+                        elif t_status == "In Progress":
                             col_status.warning("In Progress")
+                            col_act1.write("—")
+                        else:
+                            col_status.info("Pending")
+                            col_act1.write("—")
 
                         if col_act2.button("🗑️ Delete", key=f"btn_del_{t['id']}"):
                             supabase.table("tasks").delete().eq("id", t['id']).execute()
