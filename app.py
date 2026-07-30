@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان والشعار
+# 2. CSS لإخفاء الشريط العلوي، وتوسيط العنوان، وجعل النصوص والمدخلات من اليمين لليسار (RTL)
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -25,6 +25,8 @@ hide_and_center_style = """
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 0rem !important;
+        direction: rtl;
+        text-align: right;
     }
     
     .centered-title {
@@ -37,6 +39,12 @@ hide_and_center_style = """
         flex-direction: column;
         align-items: center;
         justify-content: center;
+    }
+
+    /* جعل حقول النصوص والكتابة تدعم اليمين لليسار */
+    input, textarea, div[data-baseweb="select"] {
+        direction: rtl !important;
+        text-align: right !important;
     }
     </style>
 """
@@ -332,7 +340,6 @@ else:
 
                 if active_tasks:
                     for task in active_tasks:
-                        # تعديل الأعمدة لتخصيص مكان لزر التعديل للأدمن
                         if is_admin:
                             col_id, col_title, col_assignee, col_date, col_status, col_edit, col_action = st.columns([1, 2.5, 1.5, 1.5, 1.5, 1, 1.5])
                         else:
@@ -344,7 +351,6 @@ else:
 
                         col_id.write(f"#{task['id']}")
                         
-                        # نافذة تعديل اسم المهمة للأدمن
                         if is_admin:
                             if st.session_state.editing_task_id == task['id']:
                                 with st.form(key=f"edit_form_{task['id']}"):
