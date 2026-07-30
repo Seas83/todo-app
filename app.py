@@ -98,6 +98,8 @@ if "show_change_pass" not in st.session_state:
     st.session_state.show_change_pass = False
 if "show_add_user" not in st.session_state:
     st.session_state.show_add_user = False
+if "editing_task_id" not in st.session_state:
+    st.session_state.editing_task_id = None
 
 current_users_db = get_users_from_db()
 EMPLOYEES_ONLY = [u for u in current_users_db.keys() if u != ADMIN_USER]
@@ -330,14 +332,40 @@ else:
 
                 if active_tasks:
                     for task in active_tasks:
-                        col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
+                        # تعديل الأعمدة لتخصيص مكان لزر التعديل للأدمن
+                        if is_admin:
+                            col_id, col_title, col_assignee, col_date, col_status, col_edit, col_action = st.columns([1, 2.5, 1.5, 1.5, 1.5, 1, 1.5])
+                        else:
+                            col_id, col_title, col_assignee, col_date, col_status, col_action = st.columns([1, 3, 2, 2, 2, 2])
                         
                         utc_dt = datetime.fromisoformat(task['created_at'].replace('Z', '+00:00'))
                         gmt3_dt = utc_dt + timedelta(hours=3)
                         formatted_date = gmt3_dt.strftime("%Y-%m-%d %H:%M")
 
                         col_id.write(f"#{task['id']}")
-                        col_title.write(task['title'])
+                        
+                        # نافذة تعديل اسم المهمة للأدمن
+                        if is_admin:
+                            if st.session_state.editing_task_id == task['id']:
+                                with st.form(key=f"edit_form_{task['id']}"):
+                                    new_title_input = st.text_input("Edit Title", value=task['title'], label_visibility="collapsed")
+                                    c_save, c_cancel = st.columns(2)
+                                    if c_save.form_submit_button("💾 Save"):
+                                        if new_title_input.strip():
+                                            supabase.table("tasks").update({"title": new_title_input.strip()}).eq("id", task['id']).execute()
+                                            st.session_state.editing_task_id = None
+                                            st.success("Updated!")
+                                            st.rerun()
+                                    if c_cancel.form_submit_button("❌ Cancel"):
+                                        st.session_state.editing_task_id = None
+                                        st.rerun()
+                            else:
+                                col_title.write(task['title'])
+                                if col_edit.button("✏️ Edit", key=f"btn_edit_{task['id']}"):
+                                    st.session_state.editing_task_id = task['id']
+                                    st.rerun()
+                        else:
+                            col_title.write(task['title'])
                         
                         assignee_display = task['assigned_to']
                         if assignee_display == "عام ":
