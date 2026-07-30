@@ -244,7 +244,7 @@ else:
 
     st.divider()
 
-    # --- إدارة وعرض التعليمات الثابتة (من قاعدة البيانات) ---
+    # --- لوحة الأوامر والتعليمات الثابتة (بدون قائمة منسدلة) ---
     try:
         settings_res = supabase.table("settings").select("*").eq("key", "instructions").execute()
         current_instructions = ""
@@ -255,25 +255,25 @@ else:
     except:
         current_instructions = "- متابعة المهام بانتظام."
 
-    with st.expander("📌 الأوامر والتعليمات ", expanded=False):
-        if is_admin:
-            with st.form("update_instructions_form"):
-                updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=120)
-                update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
-                if update_btn:
-                    try:
-                        check_exist = supabase.table("settings").select("*").eq("key", "instructions").execute()
-                        if check_exist.data:
-                            supabase.table("settings").update({"value": updated_text}).eq("key", "instructions").execute()
-                        else:
-                            supabase.table("settings").insert({"key": "instructions", "value": updated_text}).execute()
-                        st.success("تم تحديث التعليمات بنجاح!")
-                        st.rerun()
-                    except Exception as err:
-                        st.error(f"خطأ في حفظ التعليمات: {err}")
-            st.divider()
-        
-        st.markdown(current_instructions)
+    st.markdown("### 📌 الأوامر والتعليمات")
+    
+    if is_admin:
+        with st.form("update_instructions_form"):
+            updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=100)
+            update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
+            if update_btn:
+                try:
+                    check_exist = supabase.table("settings").select("*").eq("key", "instructions").execute()
+                    if check_exist.data:
+                        supabase.table("settings").update({"value": updated_text}).eq("key", "instructions").execute()
+                    else:
+                        supabase.table("settings").insert({"key": "instructions", "value": updated_text}).execute()
+                    st.success("تم تحديث التعليمات بنجاح!")
+                    st.rerun()
+                except Exception as err:
+                    st.error(f"خطأ في حفظ التعليمات: {err}")
+    else:
+        st.info(current_instructions)
 
     st.divider()
 
