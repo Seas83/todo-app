@@ -2,7 +2,6 @@ import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
-import bcrypt
 
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
@@ -66,16 +65,7 @@ except Exception as e:
 
 ADMIN_USER = "Fadi"
 
-# دالة التحقق من كلمة المرور المشفرة أو النصية
-def verify_password(stored_password, provided_password):
-    if stored_password.startswith("$2b$") or stored_password.startswith("$2a$"):
-        try:
-            return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password.encode('utf-8'))
-        except:
-            return False
-    return stored_password == provided_password
-
-# جلب المستخدمين من قاعدة البيانات وترتيبهم أبجدياً
+# جلب المستخدمين وكلمات المرور بالنص الصريح من قاعدة البيانات وترتيبهم أبجدياً
 def get_users_from_db():
     try:
         res = supabase.table("users").select("*").execute()
@@ -136,7 +126,7 @@ if not st.session_state.get("authenticated", False):
         
         if submit:
             clean_user = username_input.strip()
-            if clean_user in current_users_db and verify_password(current_users_db[clean_user], password_input):
+            if clean_user in current_users_db and current_users_db[clean_user] == password_input:
                 st.session_state.authenticated = True
                 st.session_state.username = clean_user
                 st.query_params["logged_user"] = clean_user
@@ -190,7 +180,7 @@ else:
             st.session_state.show_add_user = False
             st.rerun()
 
-    # --- نافذة إدارة الموظفين (عرض، تعديل الاسم وكلمة المرور، وحذف) ---
+    # --- نافذة إدارة الموظفين (عرض الاسم وكلمة السر بوضوح، مع القدرة على التعديل والحذف) ---
     if is_admin and st.session_state.show_add_user:
         with st.expander("👥 Employee Management (Add / Edit / Delete)", expanded=True):
             st.subheader("➕ Add New Employee")
@@ -209,8 +199,7 @@ else:
                         st.warning("Password cannot be empty.")
                     else:
                         try:
-                            hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                            supabase.table("users").insert({"username": clean_name, "password": hashed_pw}).execute()
+                            supabase.table("users").insert({"username": clean_name, "password": new_password.strip()}).execute()
                             st.success(f"User '{clean_name}' added successfully to database!")
                             st.rerun()
                         except Exception as err:
@@ -223,10 +212,10 @@ else:
                 c_u, c_p, c_edit, c_del = st.columns([2, 2, 1, 1])
                 c_u.write(f"👤 **{uname}**")
                 
-                pass_display = upass if not (upass.startswith("$2b$") or upass.startswith("$2a$")) else "🔒 [Hashed Password]"
-                c_p.text(f"Pass: {pass_display}")
+                # عرض كلمة المرور بوضوح تام للأدمن
+                c_p.text(f"Pass: {upass}")
                 
-                # نموذج تعديل اسم المستخدم وكلمة المرور للموظف من قبل الأدمن
+                # نموذج تعديل اسم المستخدم وكلمة المرور بوضوح
                 if st.session_state.editing_emp_user == uname:
                     with st.form(key=f"edit_emp_form_{uname}"):
                         edit_name_input = st.text_input("Edit Username", value=uname, key=f"name_inp_{uname}")
@@ -240,7 +229,7 @@ else:
                                 try:
                                     update_data = {"username": new_clean_name}
                                     if edit_pass_input.strip():
-                                        update_data["password"] = bcrypt.hashpw(edit_pass_input.strip().encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                                        update_data["password"] = edit_pass_input.strip()
                                     
                                     supabase.table("users").update(update_data).eq("username", uname).execute()
                                     st.session_state.editing_emp_user = None
@@ -256,7 +245,7 @@ else:
                         st.session_state.editing_emp_user = uname
                         st.rerun()
 
-                # زر الحذف (لا يظهر لحساب الأدمن الأساسي Fadi لحمايته)
+                # زر الحذف (مفعل لجميع الموظفين ما عدا حساب الأدمن الرئيسي Fadi)
                 if uname != ADMIN_USER:
                     if c_del.button("🗑️ Delete", key=f"btn_del_emp_{uname}"):
                         try:
@@ -279,7 +268,7 @@ else:
                 
                 if pass_submit:
                     actual_p = current_users_db.get(current_user, "")
-                    if not verify_password(actual_p, current_p):
+                    if current_p != actual_p:
                         st.error("Current password is incorrect.")
                     elif not new_p.strip():
                         st.warning("New password cannot be empty.")
@@ -287,8 +276,7 @@ else:
                         st.error("New passwords do not match.")
                     else:
                         try:
-                            hashed_new_pw = bcrypt.hashpw(new_p.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                            supabase.table("users").update({"password": hashed_new_pw}).eq("username", current_user).execute()
+                            supabase.table("users").update({"password": new_p.strip()}).eq("username", current_user).execute()
                             st.success("Password updated successfully in database!")
                             st.session_state.show_change_pass = False
                             st.rerun()
