@@ -2,11 +2,12 @@ import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
+import bcrypt
 
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. CSS لإخفاء الشريط العلوي، وتوسيط العنوان، وجعل النصوص والمدخلات من اليمين لليسار (RTL)
+# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان وجعل واجهة النظام من اليمين لليسار (RTL)
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -41,7 +42,6 @@ hide_and_center_style = """
         justify-content: center;
     }
 
-    /* جعل حقول النصوص والكتابة تدعم اليمين لليسار */
     input, textarea, div[data-baseweb="select"] {
         direction: rtl !important;
         text-align: right !important;
@@ -73,7 +73,16 @@ except Exception as e:
 
 ADMIN_USER = "Fadi"
 
-# جلب المستخدمين مع كلمات المرور من قاعدة البيانات وترتيبهم أبجدياً بدقة
+# دالة التحقق من كلمة المرور المشفرة أو النصية (لضمان التوافق المؤقت)
+def verify_password(stored_password, provided_password):
+    if stored_password.startswith("$2b$") or stored_password.startswith("$2a$"):
+        try:
+            return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password.encode('utf-8'))
+        except:
+            return False
+    return stored_password == provided_password
+
+# جلب المستخدمين من قاعدة البيانات وترتيبهم أبجدياً
 def get_users_from_db():
     try:
         res = supabase.table("users").select("*").execute()
@@ -86,17 +95,20 @@ def get_users_from_db():
     except:
         return {"Fadi": "Fadi@1983"}
 
-# 5. Session State Management with URL persistence to prevent random logouts
+# 5. Session State Management
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = ""
 
-# التحقق من الرابط لضمان عدم ضياع الجلسة عند التحديث
+# التحقق الأمني من الوجود في قاعدة البيانات لمنع التلاعب برابط الوجود
+current_users_db = get_users_from_db()
 query_params = st.query_params
 if "logged_user" in query_params and not st.session_state.authenticated:
-    st.session_state.authenticated = True
-    st.session_state.username = query_params["logged_user"]
+    param_user = query_params["logged_user"]
+    if param_user in current_users_db:
+        st.session_state.authenticated = True
+        st.session_state.username = param_user
 
 if "last_seen_task_id" not in st.session_state:
     st.session_state.last_seen_task_id = 0
@@ -109,7 +121,6 @@ if "show_add_user" not in st.session_state:
 if "editing_task_id" not in st.session_state:
     st.session_state.editing_task_id = None
 
-current_users_db = get_users_from_db()
 EMPLOYEES_ONLY = [u for u in current_users_db.keys() if u != ADMIN_USER]
 
 # --- Login Screen ---
@@ -124,26 +135,27 @@ if not st.session_state.get("authenticated", False):
     st.markdown("<h1 class='centered-title'>Stan & Eval Division</h1>", unsafe_allow_html=True)
     
     with st.form("login_form"):
-        username_input = st.text_input("Username")
-        password_input = st.text_input("Password", type="password")
-        submit = st.form_submit_button("Login")
+        username_input = st.text_input("اسم المستخدم (Username)")
+        password_input = st.text_input("كلمة المرور (Password)", type="password")
+        submit = st.form_submit_button("تسجيل الدخول (Login)")
         
         if submit:
-            if username_input in current_users_db and current_users_db[username_input] == password_input:
+            clean_user = username_input.strip()
+            if clean_user in current_users_db and verify_password(current_users_db[clean_user], password_input):
                 st.session_state.authenticated = True
-                st.session_state.username = username_input
-                st.query_params["logged_user"] = username_input
+                st.session_state.username = clean_user
+                st.query_params["logged_user"] = clean_user
                 st.rerun()
             else:
-                st.error("Invalid username or password.")
+                st.error("اسم المستخدم أو كلمة المرور غير صحيحة.")
 
 # --- Main Dashboard / Archive View ---
 else:
     is_admin = st.session_state.username == ADMIN_USER
     current_user = st.session_state.username
 
-    role_label = " (Admin)" if is_admin else ""
-    st.markdown(f"<h1 class='centered-title'>📋Welcome {current_user}{role_label}</h1>", unsafe_allow_html=True)
+    role_label = " (مشرف - Admin)" if is_admin else ""
+    st.markdown(f"<h1 class='centered-title'>📋 مرحباً {current_user}{role_label}</h1>", unsafe_allow_html=True)
 
     if is_admin:
         col_pass, col_adduser, col_nav, col_logout = st.columns([1, 1, 1, 1])
@@ -151,29 +163,29 @@ else:
         col_pass, col_nav, col_logout = st.columns([1, 1, 1])
     
     with col_pass:
-        if st.button("🔑 Change Password", use_container_width=True):
+        if st.button("🔑 تغيير كلمة المرور", use_container_width=True):
             st.session_state.show_change_pass = not st.session_state.show_change_pass
             st.session_state.show_add_user = False
 
     if is_admin:
         with col_adduser:
-            if st.button("👥 Manage Employees", use_container_width=True):
+            if st.button("👥 إدارة الموظفين", use_container_width=True):
                 st.session_state.show_add_user = not st.session_state.show_add_user
                 st.session_state.show_change_pass = False
 
     with col_nav:
         if is_admin:
             if st.session_state.view_mode == "main":
-                if st.button("🗄️ Database Archive", use_container_width=True):
+                if st.button("🗄️ أرشيف قاعدة البيانات", use_container_width=True):
                     st.session_state.view_mode = "archive"
                     st.rerun()
             else:
-                if st.button("🏠 Back to Main Board", use_container_width=True):
+                if st.button("🏠 العودة للوحة الرئيسية", use_container_width=True):
                     st.session_state.view_mode = "main"
                     st.rerun()
 
     with col_logout:
-        if st.button("Logout", use_container_width=True):
+        if st.button("تسجيل الخروج", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.username = ""
             if "logged_user" in st.query_params:
@@ -183,78 +195,81 @@ else:
             st.session_state.show_add_user = False
             st.rerun()
 
-    # --- نافذة إدارة الموظفين (إضافة، حذف، وعرض كلمات السر للأدمن) ---
+    # --- نافذة إدارة الموظفين (مع تشفير كلمات المرور أمنياً) ---
     if is_admin and st.session_state.show_add_user:
-        with st.expander("👥 Employee Management (Add / Delete / View Passwords)", expanded=True):
-            st.subheader("➕ Add New Employee")
+        with st.expander("👥 إدارة الموظفين (إضافة / حذف / عرض كلمات السر)", expanded=True):
+            st.subheader("➕ إضافة موظف جديد")
             with st.form("add_user_form"):
-                new_username = st.text_input("New Username")
-                new_password = st.text_input("Password", type="password")
-                add_user_submit = st.form_submit_button("Create User")
+                new_username = st.text_input("اسم المستخدم الجديد")
+                new_password = st.text_input("كلمة المرور", type="password")
+                add_user_submit = st.form_submit_button("إنشاء المستخدم")
                 
                 if add_user_submit:
                     clean_name = new_username.strip()
                     if not clean_name:
-                        st.warning("Username cannot be empty.")
+                        st.warning("اسم المستخدم لا يمكن أن يكون فارغاً.")
                     elif clean_name in current_users_db:
-                        st.error("User already exists.")
+                        st.error("المستخدم موجود مسبقاً.")
                     elif not new_password.strip():
-                        st.warning("Password cannot be empty.")
+                        st.warning("كلمة المرور لا يمكن أن تكون فارغة.")
                     else:
                         try:
-                            supabase.table("users").insert({"username": clean_name, "password": new_password}).execute()
-                            st.success(f"User '{clean_name}' added successfully to database!")
+                            # تشفير كلمة المرور بأمان تام باستخدام bcrypt
+                            hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                            supabase.table("users").insert({"username": clean_name, "password": hashed_pw}).execute()
+                            st.success(f"تم إضافة المستخدم '{clean_name}' بنجاح!")
                             st.rerun()
                         except Exception as err:
-                            st.error(f"Error adding user: {err}")
+                            st.error(f"خطأ في إضافة المستخدم: {err}")
 
             st.divider()
-            st.subheader("🔑 View All Users & Passwords")
-            for uname, upass in current_users_db.items():
-                st.text(f"User: {uname}  |  Password: {upass}")
+            st.subheader("🔑 عرض المستخدمين المسجلين")
+            for uname in current_users_db.keys():
+                st.text(f"المستخدم: {uname}")
 
             st.divider()
-            st.subheader("🗑️ Existing Employees List")
+            st.subheader("🗑️ قائمة الموظفين الحاليين")
             for emp in EMPLOYEES_ONLY:
                 c_name, c_btn = st.columns([3, 1])
                 c_name.write(f"👤 **{emp}**")
-                if c_btn.button(f"🗑️ Delete", key=f"del_user_{emp}"):
+                if c_btn.button(f"🗑️ حذف", key=f"del_user_{emp}"):
                     try:
                         supabase.table("users").delete().eq("username", emp).execute()
-                        st.warning(f"Employee '{emp}' deleted successfully!")
+                        st.warning(f"تم حذف الموظف '{emp}' بنجاح!")
                         st.rerun()
                     except Exception as err:
-                        st.error(f"Error deleting user: {err}")
+                        st.error(f"خطأ في حذف المستخدم: {err}")
 
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
-        with st.expander("🔑 Change Your Password", expanded=True):
+        with st.expander("🔑 تغيير كلمة المرور الخاصة بك", expanded=True):
             with st.form("change_pass_form"):
-                current_p = st.text_input("Current Password", type="password")
-                new_p = st.text_input("New Password", type="password")
-                confirm_p = st.text_input("Confirm New Password", type="password")
-                pass_submit = st.form_submit_button("Update Password")
+                current_p = st.text_input("كلمة المرور الحالية", type="password")
+                new_p = st.text_input("كلمة المرور الجديدة", type="password")
+                confirm_p = st.text_input("تأكيد كلمة المرور الجديدة", type="password")
+                pass_submit = st.form_submit_button("تحديث كلمة المرور")
                 
                 if pass_submit:
                     actual_p = current_users_db.get(current_user, "")
-                    if current_p != actual_p:
-                        st.error("Current password is incorrect.")
+                    if not verify_password(actual_p, current_p):
+                        st.error("كلمة المرور الحالية غير صحيحة.")
                     elif not new_p.strip():
-                        st.warning("New password cannot be empty.")
+                        st.warning("كلمة المرور الجديدة لا يمكن أن تكون فارغة.")
                     elif new_p != confirm_p:
-                        st.error("New passwords do not match.")
+                        st.error("كلمتا المرور غير متطابقتين.")
                     else:
                         try:
-                            supabase.table("users").update({"password": new_p}).eq("username", current_user).execute()
-                            st.success("Password updated successfully in database!")
+                            hashed_new_pw = bcrypt.hashpw(new_p.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                            supabase.table("users").update({"password": hashed_new_pw}).eq("username", current_user).execute()
+                            st.success("تم تحديث كلمة المرور بنجاح!")
                             st.session_state.show_change_pass = False
                             st.rerun()
                         except Exception as err:
-                            st.error(f"Error updating password: {err}")
+                            st.error(f"خطأ في تحديث كلمة المرور: {err}")
 
     st.divider()
 
-    # --- لوحة الأوامر والتعليمات الثابتة (بدون قائمة منسدلة) ---
+    # --- لوحة الأوامر والتعليمات الثابتة ---
     try:
         settings_res = supabase.table("settings").select("*").eq("key", "instructions").execute()
         current_instructions = ""
@@ -269,7 +284,7 @@ else:
     
     if is_admin:
         with st.form("update_instructions_form"):
-            updated_text = st.text_area("تعديل التعليمات :", value=current_instructions, height=100)
+            updated_text = st.text_area("تعديل التعليمات:", value=current_instructions, height=100)
             update_btn = st.form_submit_button("حفظ وتحديث التعليمات")
             if update_btn:
                 try:
@@ -293,28 +308,28 @@ else:
 
     # === View 1: Main Active Tasks View ===
     if st.session_state.view_mode == "main":
-        st.subheader("➕ Add New Task")
+        st.subheader("➕ إضافة مهمة جديدة")
         with st.form("add_task_form", clear_on_submit=True):
-            task_title = st.text_input("Task Title")
-            assigned_user = st.selectbox("Assign To", ["عام "] + EMPLOYEES_ONLY)
-            add_submit = st.form_submit_button("Add Task")
+            task_title = st.text_input("عنوان المهمة")
+            assigned_user = st.selectbox("إسناد إلى", ["عام "] + EMPLOYEES_ONLY)
+            add_submit = st.form_submit_button("إضافة المهمة")
             
             if add_submit:
                 if task_title.strip():
                     supabase.table("tasks").insert({
-                        "title": task_title,
+                        "title": task_title.strip(),
                         "assigned_to": assigned_user,
                         "created_by": current_user,
                         "status": "Pending"
                     }).execute()
-                    st.success("Task added successfully!")
+                    st.success("تم إضافة المهمة بنجاح!")
                     st.rerun()
                 else:
-                    st.warning("Please enter a task title.")
+                    st.warning("الرجاء إدخال عنوان المهمة.")
 
         st.divider()
 
-        st.subheader("📌 Active Tasks Board")
+        st.subheader("📌 لوحة المهام النشطة")
         
         try:
             response = supabase.table("tasks").select("*").order("id", desc=True).execute()
@@ -325,11 +340,11 @@ else:
                 
                 if st.session_state.last_seen_task_id != 0 and max_id > st.session_state.last_seen_task_id:
                     new_task = next(t for t in all_tasks if t['id'] == max_id)
-                    st.toast(f"🔔 New task: '{new_task['title']}' assigned to {new_task['assigned_to']}", icon="🎉")
+                    st.toast(f"🔔 مهمة جديدة: '{new_task['title']}' مسندة إلى {new_task['assigned_to']}", icon="🎉")
                 
                 st.session_state.last_seen_task_id = max_id
 
-                emp_filter = st.selectbox("Filter Active Tasks by Assigned Employee", ["All", "عام "] + EMPLOYEES_ONLY)
+                emp_filter = st.selectbox("تصفية المهام حسب الموظف", ["All", "عام "] + EMPLOYEES_ONLY)
 
                 active_tasks = []
                 for t in all_tasks:
@@ -354,20 +369,20 @@ else:
                         if is_admin:
                             if st.session_state.editing_task_id == task['id']:
                                 with st.form(key=f"edit_form_{task['id']}"):
-                                    new_title_input = st.text_input("Edit Title", value=task['title'], label_visibility="collapsed")
+                                    new_title_input = st.text_input("تعديل العنوان", value=task['title'], label_visibility="collapsed")
                                     c_save, c_cancel = st.columns(2)
-                                    if c_save.form_submit_button("💾 Save"):
+                                    if c_save.form_submit_button("💾 حفظ"):
                                         if new_title_input.strip():
                                             supabase.table("tasks").update({"title": new_title_input.strip()}).eq("id", task['id']).execute()
                                             st.session_state.editing_task_id = None
-                                            st.success("Updated!")
+                                            st.success("تم التحديث!")
                                             st.rerun()
-                                    if c_cancel.form_submit_button("❌ Cancel"):
+                                    if c_cancel.form_submit_button("❌ إلغاء"):
                                         st.session_state.editing_task_id = None
                                         st.rerun()
                             else:
                                 col_title.write(task['title'])
-                                if col_edit.button("✏️ Edit", key=f"btn_edit_{task['id']}"):
+                                if col_edit.button("✏️ تعديل", key=f"btn_edit_{task['id']}"):
                                     st.session_state.editing_task_id = task['id']
                                     st.rerun()
                         else:
@@ -385,36 +400,36 @@ else:
                         started_by = task.get('started_by')
 
                         if current_status in ["In Progress", "قيد التنفيذ"]:
-                            col_status.warning(f"In Progress\n(By: {started_by})")
-                            if col_action.button("✅ Complete Task", key=f"btn_comp_{task['id']}"):
+                            col_status.warning(f"قيد التنفيذ\n(بواسطة: {started_by})")
+                            if col_action.button("✅ إتمام المهمة", key=f"btn_comp_{task['id']}"):
                                 now_utc = datetime.utcnow().isoformat()
                                 supabase.table("tasks").update({
                                     "status": "Completed",
                                     "completed_by": current_user,
                                     "completed_at": now_utc
                                 }).eq("id", task['id']).execute()
-                                st.success(f"Task completed by {current_user} and archived.")
+                                st.success(f"تم إتمام المهمة بواسطة {current_user}.")
                                 st.rerun()
                         else:
-                            col_status.info("Pending")
-                            if col_action.button("⏳ Start Task", key=f"btn_start_{task['id']}"):
+                            col_status.info("معلقة")
+                            if col_action.button("⏳ البدء بالمهمة", key=f"btn_start_{task['id']}"):
                                 supabase.table("tasks").update({
                                     "status": "In Progress",
                                     "started_by": current_user
                                 }).eq("id", task['id']).execute()
-                                st.success(f"Task started by {current_user}.")
+                                st.success(f"تم بدء المهمة بواسطة {current_user}.")
                                 st.rerun()
                 else:
-                    st.info("No active tasks found.")
+                    st.info("لا توجد مهام نشطة.")
             else:
-                st.info("No tasks found.")
+                st.info("لا توجد مهام مسجلة.")
                 
         except Exception as e:
-            st.error(f"Error fetching tasks: {e}")
+            st.error(f"خطأ في جلب المهام: {e}")
 
     # === View 2: Full Database Archive View (Admin Only) ===
     elif is_admin and st.session_state.view_mode == "archive":
-        st.subheader("🗄️ Database Archive (Admin View)")
+        st.subheader("🗄️ أرشيف قاعدة البيانات (عرض المشرف)")
         
         try:
             response = supabase.table("tasks").select("*").order("id", desc=True).execute()
@@ -423,11 +438,11 @@ else:
             if all_tasks:
                 col_search, col_status_f, col_emp_f = st.columns([2, 1, 1])
                 with col_search:
-                    search_query = st.text_input("🔍 Search task title...", "")
+                    search_query = st.text_input("🔍 بحث في عنوان المهمة...", "")
                 with col_status_f:
-                    status_filter = st.selectbox("Filter by Status", ["All", "Pending", "In Progress", "Completed"])
+                    status_filter = st.selectbox("تصفية حسب الحالة", ["All", "Pending", "In Progress", "Completed"])
                 with col_emp_f:
-                    emp_filter = st.selectbox("Filter by Assigned Employee", ["All", "عام "] + EMPLOYEES_ONLY)
+                    emp_filter = st.selectbox("تصفية حسب الموظف المسند إليه", ["All", "عام "] + EMPLOYEES_ONLY)
 
                 filtered_tasks = []
                 for t in all_tasks:
@@ -454,7 +469,7 @@ else:
                         col_title.write(t['title'])
                         
                         creator = t.get('created_by', 'غير معروف')
-                        col_assignee.write(f"👤 Assigned: {t['assigned_to']}\n✍️ Added by: **{creator}**\n🕒 Created: {created_date}")
+                        col_assignee.write(f"👤 المسند إليه: {t['assigned_to']}\n✍️ أضيفت بواسطة: **{creator}**\n🕒 وقت الإنشاء: {created_date}")
                         
                         info_text = "—"
                         started_user = t.get('started_by')
@@ -463,13 +478,13 @@ else:
 
                         details_list = []
                         if started_user:
-                            details_list.append(f"⏳ Started by: **{started_user}**")
+                            details_list.append(f"⏳ بدأت بواسطة: **{started_user}**")
                         
                         if completed_user and completed_at_raw:
                             comp_utc = datetime.fromisoformat(completed_at_raw.replace('Z', '+00:00'))
                             comp_gmt3 = comp_utc + timedelta(hours=3)
                             completed_date_str = comp_gmt3.strftime("%Y-%m-%d %H:%M")
-                            details_list.append(f"✅ Ended by: **{completed_user}**\n🕒 End Time: {completed_date_str}")
+                            details_list.append(f"✅ انتهت بواسطة: **{completed_user}**\n🕒 وقت الانتهاء: {completed_date_str}")
                         
                         if details_list:
                             info_text = "\n".join(details_list)
@@ -478,33 +493,33 @@ else:
 
                         t_status = t.get('status', 'Pending')
                         if t_status == "Completed":
-                            col_status.success("Completed")
-                            if col_act1.button("🔄 Reopen", key=f"btn_reopen_{t['id']}"):
+                            col_status.success("مكتملة")
+                            if col_act1.button("🔄 إعادة فتح", key=f"btn_reopen_{t['id']}"):
                                 supabase.table("tasks").update({
                                     "status": "Pending",
                                     "started_by": None,
                                     "completed_by": None,
                                     "completed_at": None
                                 }).eq("id", t['id']).execute()
-                                st.success("Task reopened.")
+                                st.success("تم إعادة فتح المهمة.")
                                 st.rerun()
                         elif t_status == "In Progress":
-                            col_status.warning("In Progress")
+                            col_status.warning("قيد التنفيذ")
                             col_act1.write("—")
                         else:
-                            col_status.info("Pending")
+                            col_status.info("معلقة")
                             col_act1.write("—")
 
-                        if col_act2.button("🗑️ Delete", key=f"btn_del_{t['id']}"):
+                        if col_act2.button("🗑️ حذف", key=f"btn_del_{t['id']}"):
                             supabase.table("tasks").delete().eq("id", t['id']).execute()
-                            st.warning(f"Task #{t['id']} deleted permanently.")
+                            st.warning(f"تم حذف المهمة #{t['id']} نهائياً.")
                             st.rerun()
 
-                    st.caption(f"Total tasks displayed: {len(filtered_tasks)}")
+                    st.caption(f"إجمالي المهام المعروضة: {len(filtered_tasks)}")
                 else:
-                    st.info("No tasks found in archive.")
+                    st.info("لا توجد مهام مطابقة في الأرشيف.")
             else:
-                st.info("Database is currently empty.")
+                st.info("قاعدة البيانات فارغة حالياً.")
                 
         except Exception as e:
-            st.error(f"Error loading database archive: {e}")
+            st.error(f"خطأ في تحميل أرشيف قاعدة البيانات: {e}")
