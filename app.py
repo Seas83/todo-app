@@ -7,7 +7,7 @@ import bcrypt
 # 1. Page Configuration
 st.set_page_config(page_title="Task Management System", page_icon="📋", layout="wide")
 
-# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان (بدون تعديل اتجاه النص)
+# 2. CSS لإخفاء الشريط العلوي وتوسيط العنوان
 hide_and_center_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -113,6 +113,8 @@ if "show_add_user" not in st.session_state:
     st.session_state.show_add_user = False
 if "editing_task_id" not in st.session_state:
     st.session_state.editing_task_id = None
+if "editing_emp_user" not in st.session_state:
+    st.session_state.editing_emp_user = None
 
 EMPLOYEES_ONLY = [u for u in current_users_db.keys() if u != ADMIN_USER]
 
@@ -188,9 +190,9 @@ else:
             st.session_state.show_add_user = False
             st.rerun()
 
-    # --- نافذة إدارة الموظفين ---
+    # --- نافذة إدارة الموظفين (عرض، تعديل، وحذف) ---
     if is_admin and st.session_state.show_add_user:
-        with st.expander("👥 Employee Management (Add / Delete / View Passwords)", expanded=True):
+        with st.expander("👥 Employee Management (Add / Edit / Delete)", expanded=True):
             st.subheader("➕ Add New Employee")
             with st.form("add_user_form"):
                 new_username = st.text_input("New Username")
@@ -215,22 +217,47 @@ else:
                             st.error(f"Error adding user: {err}")
 
             st.divider()
-            st.subheader("🔑 View All Users")
-            for uname in current_users_db.keys():
-                st.text(f"User: {uname}")
-
-            st.divider()
-            st.subheader("🗑️ Existing Employees List")
-            for emp in EMPLOYEES_ONLY:
-                c_name, c_btn = st.columns([3, 1])
-                c_name.write(f"👤 **{emp}**")
-                if c_btn.button(f"🗑️ Delete", key=f"del_user_{emp}"):
-                    try:
-                        supabase.table("users").delete().eq("username", emp).execute()
-                        st.warning(f"Employee '{emp}' deleted successfully!")
+            st.subheader("🔑 View All Users & Passwords (Manage)")
+            
+            for uname, upass in current_users_db.items():
+                c_u, c_p, c_edit, c_del = st.columns([2, 2, 1, 1])
+                c_u.write(f"👤 **{uname}**")
+                
+                # عرض جزء من كلمة المرور أو النص
+                pass_display = upass if not (upass.startswith("$2b$") or upass.startswith("$2a$")) else "🔒 [Hashed Password]"
+                c_p.text(f"Pass: {pass_display}")
+                
+                # نموذج تعديل كلمة المرور للموظف من قبل الأدمن
+                if st.session_state.editing_emp_user == uname:
+                    with st.form(key=f"edit_emp_form_{uname}"):
+                        new_emp_pass = st.text_input("New Password", type="password", key=f"inp_{uname}")
+                        c_s, c_c = st.columns(2)
+                        if c_s.form_submit_button("💾 Save"):
+                            if new_emp_pass.strip():
+                                hashed_new = bcrypt.hashpw(new_emp_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                                supabase.table("users").update({"password": hashed_new}).eq("username", uname).execute()
+                                st.session_state.editing_emp_user = None
+                                st.success("Password updated!")
+                                st.rerun()
+                        if c_c.form_submit_button("❌ Cancel"):
+                            st.session_state.editing_emp_user = None
+                            st.rerun()
+                else:
+                    if c_edit.button("✏️ Edit", key=f"btn_edit_emp_{uname}"):
+                        st.session_state.editing_emp_user = uname
                         st.rerun()
-                    except Exception as err:
-                        st.error(f"Error deleting user: {err}")
+
+                # زر الحذف (لا يظهر لحساب الأدمن الأساسي Fadi لحمايته)
+                if uname != ADMIN_USER:
+                    if c_del.button("🗑️ Delete", key=f"btn_del_emp_{uname}"):
+                        try:
+                            supabase.table("users").delete().eq("username", uname).execute()
+                            st.warning(f"User '{uname}' deleted successfully!")
+                            st.rerun()
+                        except Exception as err:
+                            st.error(f"Error deleting user: {err}")
+                else:
+                    c_del.write("🔒 Admin")
 
     # --- نافذة تغيير كلمة السر ---
     if st.session_state.show_change_pass:
